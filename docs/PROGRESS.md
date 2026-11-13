@@ -29,3 +29,13 @@ picker feel on iOS, auto-advance timing on choice questions, the plan screen's w
 Kept out of `npm run check` on purpose: `check` stays dependency-free and sub-second; CI runs e2e as its own job.
 **Verified:** `npm run test:e2e` → 1 passed; `artifacts/smoke-welcome.png` reviewed (welcome screen, no overflow, no console errors).
 **Needs Harvey's eyes:** nothing.
+
+## 2026-11-13 T0.3 — Storage interface + LocalStore
+**Changed:** `src/data/store.js` — async storage interface (scenarios, monthly snapshots, settings, full backup
+export/import, clearAll) and `createLocalStore` (localStorage, every access try/caught, in-memory cache + fallback,
+`persistent` flag for the UI warning). Backups include the onboarding answers so export → clear → import restores everything.
+`parseBackup` validates before writing (never half-imports). `memoryStorage()` test double.
+**Verified:** `tests/store.test.js` (13 tests): empty storage, quota error, storage that throws on every access (iOS private
+mode), null storage, corrupt JSON in each key, copy-on-read, persistence across instances, snapshot upsert/sort, export→clear→import,
+bad backups rejected with readable errors and nothing written. `npm run check` → 52/52.
+**Needs Harvey's eyes:** nothing (no UI yet).

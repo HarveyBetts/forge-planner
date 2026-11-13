@@ -8,7 +8,7 @@ Phases 0–3 need nothing from Harvey except a GitHub repo to push to. Everythin
 ## Phase 0 — Foundation
 - [x] **T0.1** Run `npm run check`; confirm green. Init git if needed (`git init -b main`), first commit. Accept: clean commit, check passes.
 - [x] **T0.2** Add Playwright (devDependency) with an iPhone-sized viewport project, a smoke test (index loads, no console errors), and `npm run test:e2e`; wire into `npm run check` only if it runs headless in CI. Accept: screenshot saved to `artifacts/`.
-- [ ] **T0.3** Storage interface `src/data/store.js` (`listScenarios/getScenario/saveScenario/deleteScenario/listSnapshots/saveSnapshot/getSettings/saveSettings/exportAll/importAll`) + `LocalStore` (localStorage, try/catch, in-memory fallback). Unit tests with a fake storage. Accept: tests cover empty storage, quota error, corrupt JSON.
+- [x] **T0.3** Storage interface `src/data/store.js` (`listScenarios/getScenario/saveScenario/deleteScenario/listSnapshots/saveSnapshot/getSettings/saveSettings/exportAll/importAll`) + `LocalStore` (localStorage, try/catch, in-memory fallback). Unit tests with a fake storage. Accept: tests cover empty storage, quota error, corrupt JSON.
 - [ ] **T0.4** Seed loader (dev only): if `data/seed.local.json` exists, `npm run seed` writes an export file the app can import. Never bundled into `_site/`. Accept: `build:site` output contains no `data/`.
 
 ## Phase 1 — Engine completion (pure, tested)
