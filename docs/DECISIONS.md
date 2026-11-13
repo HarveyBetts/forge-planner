@@ -82,3 +82,10 @@ and scales living-cost items by the % from the move month, including costs that 
 figures: Speedbird salary/training costs, child costs and school fees, deposit, mortgage, car and trip costs are all inputs;
 missing ones are reported, not guessed. Events that shorten existing items ("replaces" the karting job, relocation) record a
 reversible `patch` so `expandEvents` stays idempotent. *Reverse:* conventions live in `src/engine/events.js` only.
+
+**D20 — The glide path is "the pot you'd need now, given the rest of your plan".** Not a straight line and not just the
+coast-number curve: it's the backward recursion of the engine step from the target, using the plan's own future cash flows
+(investing, school fees, deposits…). With no future flows it equals the coast-number line. So a check-in is judged against
+"enough to finish the plan as written", and big future costs correctly raise the bar. On-track band ±5% (inclusive),
+editable. Simplifications: one real return for all money (no per-pot rates or locks) and contributions assumed invested
+even after coasting. *Reverse:* swap `glidePath` for the plan's mid-case projection (`projectScenario(...).rows`).

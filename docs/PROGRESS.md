@@ -121,3 +121,13 @@ $4.3M-in-26-years ≈ $2.26M today at 2.5%, identity for real mode, unknown mode
 input untouched and nominal growth equal to the nominal return (caught and fixed an off-by-one-month in the first draft).
 `npm run check` → 112/112.
 **Needs Harvey's eyes:** nothing (no UI yet).
+
+## 2026-11-13 T1.6 — Glide path + track status
+**Changed:** `src/engine/glide.js` — `glidePath(scenario)` (pot needed at each month so the remaining plan lands exactly on
+the target; `needToday` = what you'd need right now; events expanded), `glideAt(glide, ym)`, `trackStatus(actual, glide,
+{tolerance, minBand})` → ahead / on-track / behind (±5% inclusive by default) with diff, band, ratio. Definition in D20.
+**Verified:** `tests/glide.test.js` (7): ends at target and equals the coast-number line with no flows; starting at
+`needToday` the engine projection lands on the target and every row sits on the glide (to 1e-9) with savings, fees and a
+one-off; costs raise / savings lower the line; investShare and events respected; glideAt before/inside/after; trackStatus
+exact ±5% boundaries, custom tolerance, min band, zero and negative glide. `npm run check` → 119/119.
+**Needs Harvey's eyes:** nothing yet — the chip and chart use it in T2.3/T2.4/T3.1.
