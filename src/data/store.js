@@ -17,6 +17,8 @@
 //
 // Storage errors never throw out of LocalStore: we keep working in memory and flip `persistent`.
 
+import { migrateScenario, validateScenario } from '../engine/schema.js';
+
 export const KEYS = {
   scenarios: 'forge.scenarios.v1',
   snapshots: 'forge.snapshots.v1',
@@ -156,9 +158,14 @@ export function parseBackup(text) {
   try { data = typeof text === 'string' ? JSON.parse(text) : text; } catch { throw new Error('That file isn’t valid JSON.'); }
   if (!isObj(data) || data.app !== 'forge' || data.kind !== BACKUP_KIND) throw new Error('That isn’t a Forge backup file.');
   if (data.v !== 1) throw new Error(`This backup is from a newer version of Forge (v${data.v}).`);
-  const scenarios = Array.isArray(data.scenarios) ? data.scenarios : [];
-  scenarios.forEach((s, i) => {
+  const scenarios = (Array.isArray(data.scenarios) ? data.scenarios : []).map((s, i) => {
     if (!isObj(s) || typeof s.id !== 'string' || !s.id) throw new Error(`Scenario ${i + 1} in the backup has no id.`);
+    // SECURITY.md rule 7: imported JSON is validated against the scenario schema (and migrated) first.
+    let m;
+    try { m = migrateScenario(s); } catch (e) { throw new Error(`Scenario ${i + 1} (“${s.name || s.id}”): ${e.message}`); }
+    const errs = validateScenario(m);
+    if (errs.length) throw new Error(`Scenario ${i + 1} (“${s.name || s.id}”): ${errs[0].message}${errs.length > 1 ? ` (+${errs.length - 1} more)` : ''}`);
+    return m;
   });
   const snapshots = Array.isArray(data.snapshots) ? data.snapshots : [];
   snapshots.forEach((s, i) => {

@@ -131,3 +131,15 @@ the target; `needToday` = what you'd need right now; events expanded), `glideAt(
 one-off; costs raise / savings lower the line; investShare and events respected; glideAt before/inside/after; trackStatus
 exact ±5% boundaries, custom tolerance, min band, zero and negative glide. `npm run check` → 119/119.
 **Needs Harvey's eyes:** nothing yet — the chip and chart use it in T2.3/T2.4/T3.1.
+
+## 2026-11-13 T1.7 — Scenario schema validation + migrations
+**Changed:** `src/engine/schema.js` — `validateScenario` (every field in SPEC v1 incl. items, pay steps, one-offs, pots,
+events; errors carry a `path` and a plain-English message such as “Item 1 (“Rent”): ends (2026-01) before it starts
+(2027-01).”), `migrateScenario` (v0 = pre-versioning → v1; newer versions refused with “update the app”), `parseScenario`
+(text/object → migrate → validate). Backups now validate + migrate every scenario before import (SECURITY.md rule 7 ticked;
+CSP ticked too).
+**Verified:** `tests/schema.test.js` (9): SPEC example valid, onboarding output valid, readable errors for each bad
+top-level field, retirement-in-the-past, assumptions wording, items (duplicate ids, kinds, amounts, dates, order, steps,
+non-objects) with paths, one-offs/pots/events, v0 migration (input not mutated), newer/negative versions refused,
+parseScenario on JSON text. Store tests extended for invalid scenarios in backups. `npm run check` → 128/128.
+**Needs Harvey's eyes:** nothing.

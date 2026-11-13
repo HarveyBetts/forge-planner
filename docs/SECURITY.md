@@ -21,4 +21,4 @@ Forge v2 must not inherit this.
 
 ## Verification checklist (Claude Code keeps this current)
 - [ ] two-user RLS test passes (T4.4)  - [ ] anon request returns nothing  - [ ] `grep -r service_role` finds nothing in client code
-- [ ] CSP in place  - [ ] imported JSON validated  - [ ] AI cap enforced in tests  - [ ] no personal data in `git ls-files`
+- [x] CSP in place (`index.html` meta; connect-src self + open.er-api.com)  - [x] imported JSON validated (scenarios in backups: `src/engine/schema.js` via `parseBackup`)  - [ ] AI cap enforced in tests  - [ ] no personal data in `git ls-files`

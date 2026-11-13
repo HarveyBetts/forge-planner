@@ -107,10 +107,13 @@ test('store: corrupt JSON in any key is treated as empty', async () => {
   assert.deepEqual(JSON.parse(mem.getItem(KEYS.settings)), { ok: true });
 });
 
+const VALID = { schemaVersion: 1, start: '2026-11', birth: '1997-03', retirementAge: 55,
+  assumptions: { nominalReturn: 0.07, inflation: 0.025, withdrawalRate: 0.04, retirementSpend: 40000 }, items: [], oneOffs: [] };
+
 test('store: export → clear → import restores everything (incl. onboarding answers)', async () => {
   const mem = memoryStorage({ [KEYS.onboarding]: JSON.stringify({ v: 1, answers: { q1: { v: '1997-03' } } }) });
   const s = mk(mem);
-  const a = await s.saveScenario({ name: 'Base', retirementAge: 55 });
+  const a = await s.saveScenario({ ...VALID, name: 'Base', retirementAge: 55 });
   await s.saveSnapshot({ at: '2026-11', total: 1000 });
   await s.saveSettings({ base: 'AUD' });
   const backup = await s.exportAll();
@@ -133,6 +136,9 @@ test('store: bad backups are rejected with readable errors and nothing is writte
   await assert.rejects(() => s.importAll(JSON.stringify({ app: 'forge', kind: 'full-backup', v: 9 })), /newer version/);
   await assert.rejects(() => s.importAll(JSON.stringify({ app: 'forge', kind: 'full-backup', v: 1, scenarios: [{ name: 'no id' }] })), /no id/);
   await assert.rejects(() => s.importAll(JSON.stringify({ app: 'forge', kind: 'full-backup', v: 1, snapshots: [{ at: '26-1' }] })), /bad month/);
+  await assert.rejects(() => s.importAll(JSON.stringify({ app: 'forge', kind: 'full-backup', v: 1, scenarios: [{ ...VALID, id: 'x', name: 'Bad', start: '2026-13' }] })),
+    /Scenario 1 \(“Bad”\): Start must be a month/);
+  await assert.rejects(() => s.importAll(JSON.stringify({ app: 'forge', kind: 'full-backup', v: 1, scenarios: [{ ...VALID, id: 'x', schemaVersion: 7 }] })), /newer version/);
   assert.deepEqual(await s.getSettings(), { keep: 1 });
 });
 

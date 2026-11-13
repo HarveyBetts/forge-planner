@@ -18,7 +18,7 @@ Phases 0–3 need nothing from Harvey except a GitHub repo to push to. Everythin
 - [x] **T1.4** Required-contribution + "what must be true" helpers (build on `solveMonthlyContribution`): required return, required retirement age, required spend cut. Accept: bisection tests; unreachable → `null` handled in UI contract.
 - [x] **T1.5** Real-vs-nominal toggle helpers + inflation display conversion. Accept: tests.
 - [x] **T1.6** Glide path: ideal pot-by-date line from today to target; `trackStatus(actual, glide)` → `ahead|on-track|behind` with tolerance. Accept: tests incl. boundary cases.
-- [ ] **T1.7** Scenario JSON schema validation (`docs/SPEC.md`), versioned, with migration stub. Accept: invalid inputs produce readable errors.
+- [x] **T1.7** Scenario JSON schema validation (`docs/SPEC.md`), versioned, with migration stub. Accept: invalid inputs produce readable errors.
 
 ## Phase 2 — UI (mobile-first, Slate design, demo mode)
 - [ ] **T2.1** App shell: router (hash routes; only plain `#name`), bottom nav (Plan · Timeline · Budget · Scenarios · Settings), safe-area handling, dark mode, reduced-motion. Accept: screenshot at iPhone viewport.
