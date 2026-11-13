@@ -275,3 +275,13 @@ closes, Speedbird card → q12 → × back to Timeline. Screenshots `artifacts/e
 `npm run check` → 185/185; e2e 25/25.
 **Needs Harvey's eyes:** sheet drag-to-dismiss feel on the iPhone; the preview wording.
 
+## 2026-11-13 T3.2 — Budget model = Harvey's weekly ledger
+**Changed:** `src/budget/ledger.js` (pure): Monday weeks + labels, budget shape (categories with signed amounts — money in +,
+out −; row total = sum, like the sheet's TOTAL), `weekRow` (income / spent / refunds / total), immutable `setEntry` (blank or 0
+clears), `categoryTotals`, `cashForecast` (opening cash + every week; income lands `payLagWeeks` late), `forecastBy` (the sheet's
+fortnightly "At End" rows), `upcomingBills` (next due date, month-end clamp, yearly bills), generic starter categories,
+symmetric penny rounding. Task list re-ordered so Harvey's spreadsheet comes first (D23).
+**Verified:** `tests/budget.test.js` — the forecast reproduces the spreadsheet's own fortnightly formulas **exactly** on a
+made-up 30-week budget with pay 2 weeks late; no-lag variant; week rows incl. refunds; immutability; range totals; bills.
+`npm run check` → 195/195.
+**Needs Harvey's eyes:** nothing yet (UI is T3.7).

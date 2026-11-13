@@ -100,3 +100,12 @@ modelled separately. Adding a Speedbird *salary* event on top would count the sa
 home, holidays, cars, trips and moving country (all costs on top of the answers), and its Speedbird card opens the course-start
 question instead. User events live in `settings.events` (part of full backups; not a "scenario", so backup validation stays
 strict). *Reverse:* once income and living costs are modelled as separate streams, add `speedbirdPathway` to `FORMS`.
+
+**D23 — Phase 3 follows Harvey's own spreadsheet, and it jumps the queue.** He asked (13 Nov) for his budget + investments
+workbook to be built into the app. Its model is adopted as-is: a weekly ledger with signed amounts per category (row total =
+sum), a fortnightly cash forecast where pay lands two weeks after it's earned, a bills list with due days, investment purchase
+lots rolled up per ticker with cost, value and gain in £, and a net-worth line = A$ cash × rate + Premium Bonds + investments.
+Differences: live FX instead of a typed exchange rate; prices come from the file (cached values) or are typed in — no
+GOOGLEFINANCE in a web app (live prices need the backend, later). His workbook is read on the device only; its figures are never
+committed, logged or sent anywhere. Done before T2.7–T2.9 because he asked for it directly. *Reverse:* none needed — the
+monthly-period budget (T3.2b) can sit alongside.
