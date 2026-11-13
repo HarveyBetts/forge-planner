@@ -8,15 +8,15 @@
 
 | # | Question | Answer type | |
 |---|---|---|---|
-| 1 | What's your date of birth? | month | ★ → birth |
+| 1 | What’s your date of birth? | month | ★ → birth |
 | 2 | Long term, where do you see yourself living? | pick one: Stay in Australia / Come back to the UK / Undecided |  |
-| 3 | If you're coming back to the UK, roughly when and where? | boxes: Roughly when (month), Where (town or county) (text) | ★ ⤷ |
+| 3 | If you’re coming back to the UK, roughly when and where? | boxes: Roughly when (month), Where (town or county) (text) | ★ ⤷ |
 | 4 | At what age do you want to stop needing to work? | number (age) | ★ → retirementAge |
 | 5 | Would you still do some work after that? | pick one: No, fully stop / Some part-time flying / Karting or motorsport work / My own business / Not sure |  |
 | 6 | What does a good week look like in retirement? | longtext |  |
 | 7 | Which currency should Forge show by default? | pick one: £ Pounds / A$ Aussie dollars | ★ → baseCurrency |
 | 8 | Where do you picture spending retirement? | pick one: UK / Australia / Split between both / Somewhere else |  |
-| 9 | What's your biggest financial fear? | longtext |  |
+| 9 | What’s your biggest financial fear? | longtext |  |
 | 10 | In one sentence, what does "financially free" mean to you? | text |  |
 
 ## B. The pilot pathway
@@ -36,13 +36,13 @@
 | 21 | Should Forge model upgrading to Captain? | boxes: Model it? (choice), Roughly at what age (number) | ⤷ |
 | 22 | What do you know about the airline pension so far? | longtext | ⤷ |
 | 23 | Will you take out loss-of-licence or medical insurance? | pick one: Yes / No / Not sure | ⤷ |
-| 24 | What's your Plan B if the pilot route is delayed or doesn't happen? Should Forge model it? | longtext | ★ |
+| 24 | What’s your Plan B if the pilot route is delayed or doesn’t happen? Should Forge model it? | longtext | ★ |
 
 ## C. Income today
 
 | # | Question | Answer type | |
 |---|---|---|---|
-| 25 | What's your take-home pay per month, after tax? | money /month | ★ |
+| 25 | What’s your take-home pay per month, after tax? | money /month | ★ |
 | 26 | How are you employed right now? | pick one: Casual / Part-time / Full-time / About to change |  |
 | 27 | How often are you paid? | pick one: Weekly / Fortnightly / Monthly |  |
 | 28 | Any side income? | boxes: What from (text), Per month (money) |  |
@@ -50,7 +50,7 @@
 | 30 | What yearly pay rise do you expect over the next three years? | percent (% a year) |  |
 | 31 | Do bonuses, overtime or time off in lieu matter enough to model? | pick one: Yes / No |  |
 | 32 | Enter take-home pay, or have Forge estimate tax? | pick one: I’ll enter take-home / Estimate tax for me | ★ |
-| 33 | Is there a partner's take-home pay to include? | money /month |  |
+| 33 | Is there a partner’s take-home pay to include? | money /month |  |
 | 34 | How do you prefer to enter income? | pick one: Monthly / Fortnightly / Yearly |  |
 
 ## D. Spending today
@@ -58,7 +58,7 @@
 | # | Question | Answer type | |
 |---|---|---|---|
 | 35 | Roughly what do you spend per month in total right now? | money /month | ★ |
-| 36 | What's your rent or housing cost? | money /month |  |
+| 36 | What’s your rent or housing cost? | money /month |  |
 | 37 | What are your biggest recurring costs? | longtext |  |
 | 38 | What do you spend on motorbikes and dirt bikes per year? | money /year |  |
 | 39 | What do you spend on food and eating out? | money /month |  |
@@ -108,7 +108,7 @@
 
 | # | Question | Answer type | |
 |---|---|---|---|
-| 71 | Should a partner's finances be in the plan? | pick one: Not yet / Yes, joint / Yes, kept separate |  |
+| 71 | Should a partner’s finances be in the plan? | pick one: Not yet / Yes, joint / Yes, kept separate |  |
 | 72 | Would a partner work after kids? | pick one: Full-time / Part-time / Not working / Don’t know | ⤷ |
 | 73 | Should there be a wedding budget? | boxes: Budget (money), Roughly when (month) |  |
 | 74 | How many kids do you want, and when? | boxes: How many (number), Your age at the first (number), Years between kids (number) | ★ → kids |
@@ -132,7 +132,7 @@
 | 87 | Will you pay for university? | pick one: Fully / Partly / Not at all | ⤷ |
 | 88 | Will you help with any of these? | pick any: Their first car / Their first home / Neither | ⤷ |
 | 89 | Pocket money per child? | money /month | ⤷ |
-| 90 | Which of the kids' hobbies would you fund? | longtext | ⤷ |
+| 90 | Which of the kids’ hobbies would you fund? | longtext | ⤷ |
 | 91 | A separate education fund per child? | pick one: Yes / No | ⤷ |
 | 92 | Should school fees rise faster than general inflation? | pick one: Yes, assume faster / No, same as inflation | ⤷ |
 | 93 | Would you move house to be near a particular school? | pick one: Yes / No / Maybe | ⤷ |
@@ -144,7 +144,7 @@
 | 94 | Do you want to buy or rent long-term? | pick one: Buy / Rent long-term / Not sure | ★ |
 | 95 | Where do you want to live once settled? | text |  |
 | 96 | What kind of home? Type, bedrooms, garden, new or old. | longtext |  |
-| 97 | What's your target home price, in today's money? | money one-off | ★ ⤷ → house |
+| 97 | What’s your target home price, in today’s money? | money one-off | ★ ⤷ → house |
 | 98 | What deposit, and by when? | boxes: Deposit (%) (percent), By when (month) | ★ ⤷ → house |
 | 99 | What mortgage would you be comfortable with? | boxes: Term (years) (number), Monthly payment (money) | ⤷ |
 | 100 | Include buying costs (stamp duty, legal fees, moving)? | pick one: Yes / No | ⤷ |

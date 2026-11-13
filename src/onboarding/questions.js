@@ -53,9 +53,9 @@ const Q = (n, section, type, text, extra = {}) => ({ id: 'q' + n, n, section, ty
 
 export const QUESTIONS = [
   // ---------------- A. You and your timeline ----------------
-  Q(1, 'A', 'month', "What's your date of birth?", { star: true, help: 'Month and year is enough.', map: 'birth' }),
+  Q(1, 'A', 'month', "What’s your date of birth?", { star: true, help: 'Month and year is enough.', map: 'birth' }),
   Q(2, 'A', 'choice', 'Long term, where do you see yourself living?', { opts: ['Stay in Australia', 'Come back to the UK', 'Undecided'] }),
-  Q(3, 'A', 'fields', "If you're coming back to the UK, roughly when and where?", {
+  Q(3, 'A', 'fields', "If you’re coming back to the UK, roughly when and where?", {
     star: true, when: (a) => v(a, 'q2') !== 'Stay in Australia',
     fields: [{ k: 'when', type: 'month', label: 'Roughly when' }, { k: 'where', type: 'text', label: 'Where (town or county)' }],
   }),
@@ -67,7 +67,7 @@ export const QUESTIONS = [
     help: 'You can still enter any amount in either currency.',
   }),
   Q(8, 'A', 'choice', 'Where do you picture spending retirement?', { opts: ['UK', 'Australia', 'Split between both', 'Somewhere else'] }),
-  Q(9, 'A', 'longtext', "What's your biggest financial fear?"),
+  Q(9, 'A', 'longtext', "What’s your biggest financial fear?"),
   Q(10, 'A', 'text', 'In one sentence, what does "financially free" mean to you?'),
 
   // ---------------- B. The pilot pathway ----------------
@@ -109,10 +109,10 @@ export const QUESTIONS = [
   }),
   Q(22, 'B', 'longtext', 'What do you know about the airline pension so far?', { when: doingSpeedbird, help: 'Employer contribution, scheme type. "Nothing yet" is fine.' }),
   Q(23, 'B', 'choice', 'Will you take out loss-of-licence or medical insurance?', { when: doingSpeedbird, opts: YNS }),
-  Q(24, 'B', 'longtext', "What's your Plan B if the pilot route is delayed or doesn't happen? Should Forge model it?", { star: true }),
+  Q(24, 'B', 'longtext', "What’s your Plan B if the pilot route is delayed or doesn’t happen? Should Forge model it?", { star: true }),
 
   // ---------------- C. Income today ----------------
-  Q(25, 'C', 'money', "What's your take-home pay per month, after tax?", { star: true, per: 'mo' }),
+  Q(25, 'C', 'money', "What’s your take-home pay per month, after tax?", { star: true, per: 'mo' }),
   Q(26, 'C', 'choice', 'How are you employed right now?', { opts: ['Casual', 'Part-time', 'Full-time', 'About to change'] }),
   Q(27, 'C', 'choice', 'How often are you paid?', { opts: ['Weekly', 'Fortnightly', 'Monthly'], help: 'Budgeting can follow your pay cycle.' }),
   Q(28, 'C', 'fields', 'Any side income?', {
@@ -122,12 +122,12 @@ export const QUESTIONS = [
   Q(30, 'C', 'percent', 'What yearly pay rise do you expect over the next three years?', { unit: '% a year', min: 0, max: 50 }),
   Q(31, 'C', 'choice', 'Do bonuses, overtime or time off in lieu matter enough to model?', { opts: YN }),
   Q(32, 'C', 'choice', 'Enter take-home pay, or have Forge estimate tax?', { star: true, opts: ['I’ll enter take-home', 'Estimate tax for me'] }),
-  Q(33, 'C', 'money', "Is there a partner's take-home pay to include?", { per: 'mo', help: 'Skip if not.' }),
+  Q(33, 'C', 'money', "Is there a partner’s take-home pay to include?", { per: 'mo', help: 'Skip if not.' }),
   Q(34, 'C', 'choice', 'How do you prefer to enter income?', { opts: ['Monthly', 'Fortnightly', 'Yearly'] }),
 
   // ---------------- D. Spending today ----------------
   Q(35, 'D', 'money', 'Roughly what do you spend per month in total right now?', { star: true, per: 'mo' }),
-  Q(36, 'D', 'money', "What's your rent or housing cost?", { per: 'mo' }),
+  Q(36, 'D', 'money', "What’s your rent or housing cost?", { per: 'mo' }),
   Q(37, 'D', 'longtext', 'What are your biggest recurring costs?', { help: 'Subscriptions, bike, insurance, phone…' }),
   Q(38, 'D', 'money', 'What do you spend on motorbikes and dirt bikes per year?', { per: 'yr', help: 'Running costs and upgrades.' }),
   Q(39, 'D', 'money', 'What do you spend on food and eating out?', { per: 'mo' }),
@@ -204,7 +204,7 @@ export const QUESTIONS = [
   Q(70, 'F', 'choice', 'Would you downsize your home to release money?', { opts: YNM }),
 
   // ---------------- G. Partner and family ----------------
-  Q(71, 'G', 'choice', "Should a partner's finances be in the plan?", { opts: ['Not yet', 'Yes, joint', 'Yes, kept separate'] }),
+  Q(71, 'G', 'choice', "Should a partner’s finances be in the plan?", { opts: ['Not yet', 'Yes, joint', 'Yes, kept separate'] }),
   Q(72, 'G', 'choice', 'Would a partner work after kids?', { when: (a) => has(v(a, 'q71')) && v(a, 'q71') !== 'Not yet', opts: ['Full-time', 'Part-time', 'Not working', 'Don’t know'] }),
   Q(73, 'G', 'fields', 'Should there be a wedding budget?', {
     fields: [{ k: 'amount', type: 'money', per: 'once', label: 'Budget' }, { k: 'when', type: 'month', label: 'Roughly when' }],
@@ -247,7 +247,7 @@ export const QUESTIONS = [
   Q(87, 'H', 'choice', 'Will you pay for university?', { when: mayHaveKids, opts: ['Fully', 'Partly', 'Not at all'] }),
   Q(88, 'H', 'multi', 'Will you help with any of these?', { when: mayHaveKids, opts: ['Their first car', 'Their first home', 'Neither'] }),
   Q(89, 'H', 'money', 'Pocket money per child?', { when: mayHaveKids, per: 'mo' }),
-  Q(90, 'H', 'longtext', "Which of the kids' hobbies would you fund?", { when: mayHaveKids, help: 'Flying, motorsport, anything.' }),
+  Q(90, 'H', 'longtext', "Which of the kids’ hobbies would you fund?", { when: mayHaveKids, help: 'Flying, motorsport, anything.' }),
   Q(91, 'H', 'choice', 'A separate education fund per child?', { when: mayHaveKids, opts: YN }),
   Q(92, 'H', 'choice', 'Should school fees rise faster than general inflation?', { when: privateSchool, opts: ['Yes, assume faster', 'No, same as inflation'] }),
   Q(93, 'H', 'choice', 'Would you move house to be near a particular school?', { when: mayHaveKids, opts: YNM }),
@@ -256,7 +256,7 @@ export const QUESTIONS = [
   Q(94, 'I', 'choice', 'Do you want to buy or rent long-term?', { star: true, opts: ['Buy', 'Rent long-term', 'Not sure'] }),
   Q(95, 'I', 'text', 'Where do you want to live once settled?'),
   Q(96, 'I', 'longtext', 'What kind of home? Type, bedrooms, garden, new or old.'),
-  Q(97, 'I', 'money', "What's your target home price, in today's money?", { star: true, when: buying, per: 'once', map: 'house' }),
+  Q(97, 'I', 'money', "What’s your target home price, in today’s money?", { star: true, when: buying, per: 'once', map: 'house' }),
   Q(98, 'I', 'fields', 'What deposit, and by when?', {
     star: true, when: buying, map: 'house',
     fields: [{ k: 'percent', type: 'percent', label: 'Deposit (%)' }, { k: 'by', type: 'month', label: 'By when' }],

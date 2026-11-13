@@ -598,3 +598,18 @@ with `AI_EVAL_LIVE=1` sends the 10 requests through the exact request builder/pr
 Harvey's OK after H5 (logged in AI_EVAL.md → Results).
 **Needs Harvey's eyes:** after H5, say "run the AI eval" if you want the live numbers.
 
+## 2026-11-13 T6.3 — Consistency pass (screenshot set + automated shared-language checks)
+**Changed:** `tests/e2e/consistency.spec.js` photographs every screen in light and dark (welcome, question, plan, timeline,
+add-event sheet and form, budget empty and full, scenarios, settings, answers, privacy, advice, Ask Forge) and audits each one:
+tap targets ≥ 40px, inputs ≥ 16px, one h1, empty states built the same way, British spelling, "tap" not "click", curly
+apostrophes, "…", no exclamation marks, no "guaranteed", no leaked NaN/undefined, no sideways scroll. Fixes from what it found:
+10 questions' wording used straight apostrophes (→ ’; question text only, stored answers untouched; QUESTIONS.md regenerated);
+Budget's Money/Investments switch was 38px (→ 40px); the week's category names, which open "set a weekly plan", were 24px tap
+targets (→ 40px, row height unchanged); Your answers' "My plan" header button was filled while every other header button is
+outlined (→ outlined); Scenarios showed a cryptic "Coast —" (→ "Not coasting yet" / "Coasting now" / "Coast Mar 2031");
+three colour fades now use the shared easing curve. The rules are written down in DESIGN.md → "Consistency language".
+**Verified:** consistency spec clean in light and dark; visual review of all 28 screenshots (contact sheets committed:
+`docs/screens/consistency-light.jpg`, `consistency-dark.jpg`). `npm run check` 291/291; full e2e suite 54/54.
+**Needs Harvey's eyes:** flick through the contact sheets, then the real thing on your phone — anything that feels "off" between
+screens is exactly what this pass is for.
+

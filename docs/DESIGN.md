@@ -28,3 +28,19 @@ Motion: `--e-out: cubic-bezier(.22,.61,.36,1)` · `--e-slide: cubic-bezier(.22,.
 - **Sheets** (event editor etc.): Apple-style bottom sheet, grip `::before`, drag-to-dismiss on grip zone or when `scrollTop<=2`.
 - Empty states are designed screens, not blanks. Skeletons, not spinners.
 - Benchmark: native iOS / Linear / Stripe. If it looks like a default form, it's wrong.
+
+## Consistency language (T6.3 — enforced by `tests/e2e/consistency.spec.js`)
+Screenshot set of every screen, light and dark: `docs/screens/consistency-light.jpg` / `-dark.jpg` (full-size per screen in
+CI's `screenshots` artifact → `artifacts/consistency/`). The spec fails if any of these slip:
+- **Headers:** root tabs = large left-aligned title (`.bar h1.h2`), optional *outlined* small button on the right; drilled-in
+  screens = back chevron + centred title. Exactly one `h1` per screen; sheets use an `h2` with **Cancel** top-right.
+- **Tap targets** ≥ 40px tall (44 where space allows); inline links inside sentences are the only exception.
+- **Inputs** ≥ 16px font (iOS zoom).
+- **Empty states** are one shape: `.card.empty` → icon tile (`.empty-ic`), `h2.h3` title, `p.sub` text, then at most one
+  primary and one secondary action. Never a dead button: if something isn't set up, say so and say where it's set up.
+- **Motion:** only the three curve tokens (`--e-out`, `--e-slide`, `--e-spring`); entrances animate once on arrival, never on a
+  data refresh (Ask Forge animates only the newest message); everything collapses under reduced motion.
+- **Copy:** British spelling; "tap", never "click"; curly apostrophes and quotes (’ “ ”); "…" not "..."; no exclamation marks;
+  never "guaranteed"; money in today's money, rounded for headlines (£66k), exact where you type or reconcile (£2,047);
+  primary actions say what happens ("Add to my plan", "Save to my budget"), not "OK"/"Submit".
+- **Nothing leaks:** no "NaN", "undefined", "null" or "[object Object]" in visible text; no sideways scrolling.

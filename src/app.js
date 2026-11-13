@@ -340,7 +340,7 @@ function reviewHTML() {
         </button></li>`;
       }).join('') + '</ul></section>';
   }).join('');
-  return `<header class="bar"><h1 class="h2">Your answers</h1>${planReady() ? '<button class="btn small primary" data-act="plan">My plan</button>' : ''}</header>
+  return `<header class="bar"><h1 class="h2">Your answers</h1>${planReady() ? '<button class="btn small" data-act="plan">My plan</button>' : ''}</header>
     <div class="wrap">
       ${changedHTML()}
       ${missing.length ? `<p class="banner warn" role="status">Forge needs ${missing.map((id) => `question ${BY_ID[id].n}`).join(', ')} to build your plan: ${missing.map((id) => esc(BY_ID[id].text)).join(' ')}</p>` : ''}
@@ -1316,7 +1316,7 @@ function scenariosHTML() {
   }
   const m = (x) => money(x, base(), { compact: true });
   const card = (sum, extra, actions) => `<section class="card scn"><span class="scn-t">${esc(sum.name)}</span><span class="scn-s">${esc(extra)}</span>
-    <span class="scn-k"><span class="chip-s">${esc(sum.chip)}</span><span>Coast ${sum.coasting ? 'now' : sum.coastDate ? monthLabel(sum.coastDate) : '—'}</span><span>Pot at ${sum.retirementAge}: ${sum.potAtEnd < 0 ? 'short' : m(sum.potAtEnd)}</span></span>${actions || ''}</section>`;
+    <span class="scn-k"><span class="chip-s">${esc(sum.chip)}</span><span>${sum.coasting ? 'Coasting now' : sum.coastDate ? `Coast ${monthLabel(sum.coastDate)}` : 'Not coasting yet'}</span><span>Pot at ${sum.retirementAge}: ${sum.potAtEnd < 0 ? 'short' : m(sum.potAtEnd)}</span></span>${actions || ''}</section>`;
   return `<header class="bar"><h1 class="h2">Scenarios</h1></header><div class="wrap">
     ${card(mine, 'Built from your answers and the events you added', '<a class="link-btn" href="#plan" style="align-self:flex-start;padding-left:0">Open your plan</a>')}
     ${whatIfs().map((w) => { const sm = whatIfSummary(w); return sm ? card(sm, describeChanges(w.changes, base()) + (w.events === 'none' ? ' · without your added events' : ''),
