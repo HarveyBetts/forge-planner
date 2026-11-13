@@ -12,7 +12,8 @@ publishes the site at https://harveybetts.github.io/forge-planner/ . On your iPh
 ## H3 — Create a NEW Supabase project for sync (optional; ~10 min)
 Only needed if you want your data on more than one device. Forge works fully without it.
 1. supabase.com → **New project** (not the old Forge project). Region: Sydney. Save the database password somewhere safe.
-2. **SQL Editor** → New query → paste the whole of `supabase/schema.sql` from the forge-planner repo → **Run**. It's safe to re-run.
+2. **SQL Editor** → New query → paste the whole of `supabase/schema.sql` from the forge-planner repo → **Run**. It's safe to re-run
+   (re-run it whenever Claude says the schema changed).
 3. **Authentication → URL Configuration**: Site URL = `https://harveybetts.github.io/forge-planner/`.
 4. **Project Settings → API**: copy the **Project URL** and the **anon public** (publishable) key. Never copy the `service_role` key anywhere.
 5. GitHub → forge-planner → `src/config.js` → ✏️ edit → paste them between the quotes:
@@ -22,17 +23,30 @@ Then do H4 once.
 
 ## H4 — Prove the database is locked down (after H3, 2 min)
 1. Supabase → **SQL Editor** → New query → paste the whole of `supabase/tests/rls.sql` → **Run**.
-2. You should see 11 rows, **every one saying PASS** (e.g. "B cannot read A's documents, even by id | PASS"). Nothing is changed:
+2. You should see 14 rows, **every one saying PASS** (e.g. "B cannot read A's documents, even by id | PASS"). Nothing is changed:
    the script creates two throwaway users inside a transaction and rolls everything back.
 3. If any row says FAIL, or the run errors, stop and send Claude a screenshot — don't sign in on the app until it's fixed.
 4. If it errors on "insert into auth.users": create two users in Authentication → Users → Add user (any emails), then replace the two
    UUIDs at the top of the script (…000a and …000b) with theirs, and run it again.
-(Claude has run the same script against a local PostgreSQL with a Supabase stand-in: 11/11 PASS — `npm run test:rls`.)
+(Claude has run the same script against a local PostgreSQL with a Supabase stand-in: 14/14 PASS — `npm run test:rls`.)
 
-## H5 — Deploy the AI function (Phase 5)
-Supabase CLI: `supabase functions deploy planner-ai` then set secrets:
-`supabase secrets set ANTHROPIC_API_KEY=... AI_DAILY_CAP=30 ALLOWED_ORIGIN=https://<your-site>`.
-Put a spend limit on your Anthropic account before turning this on.
+## H5 — Turn on the AI planner (after H3; ~15 min, no computer needed)
+The AI runs as a small server function in your Supabase project. GitHub deploys it for you; the Anthropic key lives only in
+Supabase, never in the app or the repo.
+1. **console.anthropic.com** → sign up → **Billing**: add a small prepaid credit (e.g. US$10) → **Settings → Limits**: set a
+   monthly spend limit (e.g. US$10). This is your hard ceiling whatever happens.
+2. Anthropic console → **API keys** → Create key, name it `forge-planner` → copy it (starts `sk-ant-`). Don't paste it anywhere else.
+3. Supabase → your Forge project → **Edge Functions → Secrets** → Add new secret: name `ANTHROPIC_API_KEY`, value = the key → Save.
+   (Optional: `AI_DAILY_CAP` = questions per day per person; default 20.)
+4. Supabase → your avatar (top right) → **Account preferences → Access Tokens** → Generate new token, name `github-deploy` → copy it.
+5. Supabase → **Project Settings → General** → copy the **Project ID** (a string like `abcdefghijklmnop`).
+6. GitHub → forge-planner → **Settings → Secrets and variables → Actions → New repository secret**, twice:
+   `SUPABASE_ACCESS_TOKEN` = the token from step 4; `SUPABASE_PROJECT_REF` = the Project ID from step 5.
+7. GitHub → forge-planner → **Actions → Deploy AI function → Run workflow** (branch main). A green tick = the AI is live.
+8. In Forge (signed in): Plan → **Ask Forge** and try "What if I return to the UK in 2028?".
+Cost: each question is roughly US$0.04–0.12 on the default model (estimate from Anthropic's published per-token prices; longer
+plans and answers cost more). The daily cap and your spend limit bound it. If it ever misbehaves, delete the
+`ANTHROPIC_API_KEY` secret in Supabase and the AI switches off instantly; nothing else in Forge is affected.
 
 ## H6 — Answer the onboarding questions (first launch of the app)
 Open the app → Quick start (32 questions) now, the rest later from "Your answers". Export a backup when done.

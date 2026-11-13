@@ -13,6 +13,11 @@ Forge v2 must not inherit this.
 4. **No bank credentials** are ever collected or stored. Bank data = user-supplied CSV, parsed locally, previewed before saving.
 5. **AI** only through `planner-ai`: JWT required, atomic per-user daily cap (`bump_ai_usage`), input/output size caps,
    Anthropic key in secrets only, set `ALLOWED_ORIGIN`. Send scenario JSON only — never transactions or account names.
+   Implemented in `supabase/functions/planner-ai/handler.js`: origin allow-list → JWT checked with Supabase Auth → body ≤ 64 KB,
+   question ≤ 2,000 chars, plan ≤ 20,000 chars → daily cap (counts before the model is called; a failed check refuses) → model.
+   Plan fields are whitelisted server-side, so a buggy client can't forward budget or bank data. Errors and logs carry status
+   codes only — never the key, the token, the question, the plan or upstream error text. The AI only *proposes* changes;
+   the app shows them as a diff and nothing is applied without a tap (T5.2).
 6. **No secrets or personal data in git.** `.gitignore` covers `.env*`, `*.local.json`, `data/seed.local.json`. CI never prints secrets.
 7. **Client hardening:** add a restrictive CSP `<meta>` (self + the Supabase origin + font hosts), escape all user text before
    inserting into templates (no raw `innerHTML` with user data), validate imported JSON against the schema.
@@ -20,5 +25,5 @@ Forge v2 must not inherit this.
 9. **Backups:** Harvey can export at any time; remind monthly at check-in.
 
 ## Verification checklist (Claude Code keeps this current)
-- [~] two-user RLS test passes (T4.4 — 11/11 locally; run H4 on the real project)  - [~] anon request returns nothing (same)  - [x] `grep -r service_role` finds nothing in client code (checked 13 Nov: src/, index.html, sw.js)
-- [x] CSP in place (`index.html` meta; connect-src self + open.er-api.com)  - [x] imported JSON validated (scenarios in backups: `src/engine/schema.js` via `parseBackup`)  - [ ] AI cap enforced in tests  - [ ] no personal data in `git ls-files`
+- [~] two-user RLS test passes (T4.4 — 14/14 locally; run H4 on the real project)  - [~] anon request returns nothing (same)  - [x] `grep -r service_role` finds nothing in client code (checked 13 Nov: src/, index.html, sw.js)
+- [x] CSP in place (`index.html` meta; connect-src self + open.er-api.com)  - [x] imported JSON validated (scenarios in backups: `src/engine/schema.js` via `parseBackup`)  - [x] AI cap enforced in tests (`tests/planner-ai.test.js`: 429 before any model call, fails closed; `rls.sql`: users can't call or reset the counter; `npm run test:ai-local`: real function under Deno)  - [ ] no personal data in `git ls-files`

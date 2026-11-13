@@ -123,3 +123,19 @@ library; magic links depend on Supabase's tightly rate-limited built-in email). 
 callable only by the signed-in user for themselves. The older tables stay in `schema.sql` (unused, still owner-locked) so nothing
 breaks if they're already created. T2.2f is met by the 'onboarding' document. *Reverse:* split documents into tables later if
 sharing or server-side queries are ever needed.
+
+**D26 — Planner AI: Claude Opus 5.5 via the official SDK, structured replies, server-side refusal fallback, deploy by GitHub
+Action.** `supabase/functions/planner-ai` is split into `handler.js` (all logic, plain JS, dependencies injected, unit-tested in
+Node), `prompt.js` (system prompt + reply schema) and a thin `index.ts` that wires in `npm:@supabase/supabase-js` and
+`npm:@anthropic-ai/sdk` (pinned versions). Model default `claude-opus-5-5` (Anthropic's current default for most work; thinking is
+always on, effort `medium`), overridable with the `ANTHROPIC_MODEL` / `AI_EFFORT` secrets. Replies use structured outputs
+(`output_config.format` JSON schema: `answer` + `proposal.changes[]`), so the app never parses prose for plan changes; proposals are
+limited to six life-event types plus retirement age (q4) and retirement spend (q63), and every AI-estimated figure is listed in
+`assumed` so the UI can tag it "estimate" (CLAUDE.md §3.1). Server-side fallback (`fallbacks: "default"`, beta
+`server-side-fallback-2026-07-01`) is on: if the model's safety classifiers decline a question, the API retries on Anthropic's
+recommended fallback model in the same call; a decline from the whole chain returns a friendly "can't help with that one". Daily
+cap default 20 (was 30 in the sketch) — about US$1–2/day worst case per person at estimated per-question cost. Deployment is a
+GitHub Action (`deploy-ai.yml`) because Harvey has no computer with the Supabase CLI; it stays green and does nothing until the
+two repository secrets exist. Deployed with `--no-verify-jwt` because the function verifies the token itself with Supabase Auth
+(the gateway check doesn't accept the newer asymmetric JWT keys). *Reverse:* change the model/effort with secrets; remove
+`fallbacks`/`betas` in `buildModelRequest` to turn the fallback off; deploy by CLI instead of the Action.

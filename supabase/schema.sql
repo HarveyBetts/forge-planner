@@ -102,6 +102,7 @@ begin
   return c <= p_cap;
 end $$;
 revoke all on function public.bump_ai_usage(uuid, int) from public, anon, authenticated;
+grant execute on function public.bump_ai_usage(uuid, int) to service_role;
 
 -- "Delete my account" (Settings): removes the signed-in user; their user_docs rows go with them (on delete cascade).
 create or replace function public.delete_my_account() returns void

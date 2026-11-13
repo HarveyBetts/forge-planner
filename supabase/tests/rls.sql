@@ -16,7 +16,7 @@ do $$
 declare
   a uuid := '00000000-0000-4000-8000-00000000000a';
   b uuid := '00000000-0000-4000-8000-00000000000b';
-  cnt int; txt text; ok boolean; err text;
+  cnt int; cnt2 int; txt text; ok boolean; err text;
   procedure_ok boolean;
 begin
   -- helper: act as a user (what the app's requests look like to the database)
@@ -98,6 +98,30 @@ begin
     reset role;
     insert into rls_results (check_name, result, detail) values ('Signed-out requests cannot delete accounts', 'PASS', err);
   end;
+
+  -- AI allowance (ai_usage + bump_ai_usage): only the edge function (service role) may count; users can't reset it.
+  insert into public.ai_usage (user_id, day, calls) values (b, current_date, 5);
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', b::text, true);
+  set local role authenticated;
+  with u as (update public.ai_usage set calls = 0 where user_id = b returning 1) select count(*) into cnt from u;
+  reset role;
+  select calls into cnt2 from public.ai_usage where user_id = b and day = current_date;
+  insert into rls_results (check_name, result, detail) values ('Users cannot reset their own AI allowance', case when cnt = 0 and cnt2 = 5 then 'PASS' else 'FAIL' end, format('%s row(s) changed, count now %s', cnt, cnt2));
+  begin
+    set local role authenticated;
+    perform public.bump_ai_usage(b, 1000);
+    reset role;
+    insert into rls_results (check_name, result, detail) values ('Users cannot call the AI usage counter', 'FAIL', 'call was allowed');
+  exception when others then
+    get stacked diagnostics err = message_text;
+    reset role;
+    insert into rls_results (check_name, result, detail) values ('Users cannot call the AI usage counter', 'PASS', err);
+  end;
+  set local role service_role;
+  txt := concat_ws(',', public.bump_ai_usage(a, 2)::text, public.bump_ai_usage(a, 2)::text, public.bump_ai_usage(a, 2)::text);
+  reset role;
+  insert into rls_results (check_name, result, detail) values ('The edge function''s daily cap stops at the limit', case when txt = 'true,true,false' then 'PASS' else 'FAIL' end, txt);
 
   -- delete_my_account as B deletes only B (and B's documents); A is untouched
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);

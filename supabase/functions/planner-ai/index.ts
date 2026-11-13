@@ -1,62 +1,41 @@
-// Supabase Edge Function (Deno) — Forge planner AI.   STATUS: REFERENCE SKETCH, UNTESTED.
-// Claude Code: finish, test with mocks, then deploy (see docs/HUMAN_TODO.md H5).
+// Supabase Edge Function (Deno): Forge planner AI. All the logic lives in handler.js (tested in Node with
+// mocks: tests/planner-ai.test.js). This file only wires in the real services.
 //
-// Rules (docs/SECURITY.md): require a valid user JWT; enforce a hard per-user daily cap;
-// the Anthropic key lives ONLY in function secrets; send scenario JSON only (never bank data);
-// cap input and output size.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// Secrets (Supabase dashboard → Edge Functions → Secrets; see docs/HUMAN_TODO.md H5):
+//   ANTHROPIC_API_KEY   required — lives ONLY here, never in the app or in git
+//   AI_DAILY_CAP        optional, default 20 questions per person per day (UTC)
+//   ALLOWED_ORIGIN      optional, default https://harveybetts.github.io (comma-separate several)
+//   ANTHROPIC_MODEL     optional, default claude-opus-5-5
+//   AI_EFFORT           optional, low | medium | high (default medium)
+// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase automatically.
+import Anthropic from "npm:@anthropic-ai/sdk@1.6.0";
+import { createClient } from "npm:@supabase/supabase-js@2.119.0";
+import { createHandler } from "./handler.js";
 
-const DAILY_CAP = Number(Deno.env.get("AI_DAILY_CAP") ?? "30");
-const MODEL = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-5-5"; // verify current model id in the docs
-const MAX_INPUT_CHARS = 20000;
-const cors = {
-  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") ?? "*", // set to the Pages origin in production
-  "Access-Control-Allow-Headers": "authorization, content-type",
-};
+const env = (name: string) => Deno.env.get(name) ?? "";
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  const json = (b: unknown, status = 200) =>
-    new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user }, error } = await userClient.auth.getUser();
-  if (error || !user) return json({ error: "unauthorised" }, 401);
-
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data: allowed, error: capErr } = await admin.rpc("bump_ai_usage", { p_user: user.id, p_cap: DAILY_CAP });
-  if (capErr) return json({ error: "usage check failed" }, 500);
-  if (!allowed) return json({ error: "daily AI limit reached" }, 429);
-
-  let body: { question?: string; scenario?: unknown };
-  try { body = await req.json(); } catch { return json({ error: "bad json" }, 400); }
-  const question = String(body.question ?? "").slice(0, 2000);
-  const scenario = JSON.stringify(body.scenario ?? {}).slice(0, MAX_INPUT_CHARS);
-  if (!question) return json({ error: "question required" }, 400);
-
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": Deno.env.get("ANTHROPIC_API_KEY")!,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 800,
-      system:
-        "You are Forge's planning assistant. You get a user's financial scenario as JSON (real terms, today's money). " +
-        "Explain trade-offs plainly, give ranges not certainties, state assumptions, and never present output as regulated financial advice. " +
-        "If asked to change the plan, reply with a short explanation and a JSON patch inside a ```json block.",
-      messages: [{ role: "user", content: `Scenario:\n${scenario}\n\nQuestion: ${question}` }],
-    }),
-  });
-  if (!r.ok) return json({ error: "ai upstream error", status: r.status }, 502);
-  const out = await r.json();
-  const text = (out.content ?? []).filter((c: { type: string }) => c.type === "text")
-    .map((c: { text: string }) => c.text).join("\n");
-  return json({ answer: text });
+const anthropic = new Anthropic({ apiKey: env("ANTHROPIC_API_KEY"), maxRetries: 1, timeout: 120_000 });
+const admin = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), {
+  auth: { persistSession: false, autoRefreshToken: false },
 });
+
+const handler = createHandler({
+  env: { get: env },
+  // Verifies the user's access token with Supabase Auth (signature, expiry, not signed out).
+  async getUser(token: string) {
+    const { data, error } = await admin.auth.getUser(token);
+    return error || !data?.user ? null : { id: data.user.id };
+  },
+  // Atomic per-user daily counter (supabase/schema.sql → bump_ai_usage). true = still under the cap.
+  async bumpUsage(userId: string, cap: number) {
+    const { data, error } = await admin.rpc("bump_ai_usage", { p_user: userId, p_cap: cap });
+    if (error) throw new Error("usage check failed");
+    return data === true;
+  },
+  // deno-lint-ignore no-explicit-any
+  callModel: (params: any) => anthropic.beta.messages.create(params),
+  // Status codes only: never the question, the plan, tokens or upstream error text.
+  log: (event: string, fields: Record<string, unknown>) => console.log(JSON.stringify({ event, ...fields })),
+});
+
+Deno.serve(handler);

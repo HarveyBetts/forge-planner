@@ -1,0 +1,34 @@
+# Deploys the planner AI edge function to Supabase (docs/HUMAN_TODO.md H5). Runs when the function changes on main,
+# or by hand: Actions → "Deploy AI function" → Run workflow. Does nothing (and stays green) until the two
+# repository secrets SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF exist. The Anthropic key is NOT stored here:
+# it lives only in Supabase → Edge Functions → Secrets.
+name: Deploy AI function
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['supabase/functions/**', '.github/workflows/deploy-ai.yml']
+concurrency: { group: deploy-ai, cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node --test tests/planner-ai.test.js
+      - uses: denoland/setup-deno@v2
+        with: { deno-version: v2.x }
+      - run: npm run test:ai-local
+      - name: Not set up yet
+        if: env.SUPABASE_ACCESS_TOKEN == '' || env.PROJECT_REF == ''
+        run: echo "::notice::SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF secrets not set (docs/HUMAN_TODO.md H5), so nothing was deployed."
+      - uses: supabase/setup-cli@v1
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.PROJECT_REF != ''
+        with: { version: latest }
+      # --no-verify-jwt: the function checks the sign-in itself with Supabase Auth (works with both legacy and new JWT keys).
+      - if: env.SUPABASE_ACCESS_TOKEN != '' && env.PROJECT_REF != ''
+        run: supabase functions deploy planner-ai --project-ref "$PROJECT_REF" --no-verify-jwt

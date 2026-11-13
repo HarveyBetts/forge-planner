@@ -542,3 +542,23 @@ HUMAN_TODO H4 rewritten with exact steps and a fallback; SECURITY checklist upda
 errors quoted: "new row violates row-level security policy…", "permission denied for table user_docs").
 **Needs Harvey's eyes:** run H4 once after creating the Supabase project (H3). Task marked `[~]` until then.
 
+## 2026-11-13 T5.1 — Planner AI edge function finished and tested (deploy is H5)
+**Changed:** `supabase/functions/planner-ai/` rewritten from the untested sketch: `handler.js` (origin allow-list → sign-in checked
+with Supabase Auth → size caps → daily cap counted *before* the model → Claude via the official SDK → reply checked and trimmed),
+`prompt.js` (system prompt: today's money, ranges, never "guaranteed", never invent figures, not regulated advice, no product
+picks; JSON reply schema with an answer and up to 5 proposed changes, AI-estimated figures listed in `assumed`), `index.ts` (Deno
+wiring, pinned SDKs), `deno.json`. Plan fields are whitelisted on the server, so budget/bank data can't be forwarded even by a
+buggy client. Model `claude-opus-5-5`, effort medium, server-side refusal fallback on (D26). `schema.sql`: explicit
+`grant execute … to service_role` on `bump_ai_usage`. `rls.sql`: +3 checks (users can't reset their allowance or call the
+counter; the cap stops at the limit) → 14. New `.github/workflows/deploy-ai.yml` (deploys from GitHub once Harvey adds two
+secrets) and a CI job that type-checks and runs the function. HUMAN_TODO H5 rewritten as phone-only steps.
+**Verified:** `tests/planner-ai.test.js` (28): 401 without/with bad token and nothing else runs; 403 other origins; 400/413 bad or
+oversized input, none of which use up the allowance; 429 over the cap and the model is never called; 503 when the counter fails
+(fails closed); request shape (model, fallback beta, effort, JSON schema, cached system prompt, no thinking/temperature); budget,
+transactions and notes stripped; refusal → friendly reply; truncated/garbled → 502; upstream errors never leak the key, token,
+question or upstream text in responses or logs; proposals validated (unknown types, bad JSON, >5 dropped). `npm run test:ai-local`
+runs the REAL `index.ts` under Deno 2.9 with real supabase-js + Anthropic SDK against local stand-ins for Supabase Auth, PostgREST
+and the Anthropic API: **16/16 PASS** (beta header sent, key only in a header, cap enforced, 502 without leaking). `deno check
+index.ts` clean. `npm run test:rls` → **14/14 PASS**. No real Anthropic call was made (no key in this environment).
+**Needs Harvey's eyes:** H5 when you want the AI on (needs H3 first). The first real answer is the true test.
+
