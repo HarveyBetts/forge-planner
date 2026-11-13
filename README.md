@@ -22,6 +22,9 @@ Your money planner: when you'll be able to stop working, what your life plans co
 3. **Use your real balances.** Budget → **Use these as my current balances**.
 4. **Add life events** (kids, a home, trips, a move): **Timeline → Add a life event**.
 5. **Check in monthly** on the Plan screen — it records how you're doing and keeps the plan honest.
+6. *Optional:* **sync between devices** (docs/HUMAN_TODO.md H3) and the **AI planner** (H5). Then Plan → **Ask Forge**:
+   "What if I move back to the UK in 2028?" — it answers using your plan and can suggest changes, which you tick and
+   **Add to my plan** (or not). Nothing changes without that tap, and there's an Undo.
 
 ## The tabs
 | Tab | What it's for |
@@ -33,7 +36,9 @@ Your money planner: when you'll be able to stop working, what your life plans co
 | **Settings** | Appearance, how blunt Forge is, assumptions (inflation etc.), **backups** |
 
 ## Your data
-- Everything lives **on your phone only**. Nothing is uploaded, and your bank details are never asked for.
+- Everything lives **on your phone only** unless you turn on sync (your own locked database) or ask the AI planner a question
+  (your plan's figures go to Anthropic's Claude through Forge's server — never your budget or bank data). Your bank details are
+  never asked for.
 - **Back up** regularly: Settings → **Back up everything** (one file — save it to iCloud Drive). Forge reminds you monthly.
 - New phone or something went wrong? Settings → **Restore from a backup**.
 - Settings → **Delete all my data** wipes it from the phone.

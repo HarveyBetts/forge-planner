@@ -63,7 +63,16 @@ export function createMockSupabase({ confirmEmails = false } = {}) {
       for (const [t, id] of tokens) if (id === uid) tokens.delete(t);
       return reply(204);
     }
+    // planner-ai edge function stand-in: the test sets mock.ai = (body, uid) => ({ status, body }).
+    if (p === '/functions/v1/planner-ai' && method === 'POST') {
+      if (!uid) return reply(401, { error: 'Sign in to use the AI planner.', code: 'auth' });
+      api.aiCalls.push(body);
+      if (!api.ai) return reply(502, { error: 'The AI service is unavailable right now. Try again in a minute.', code: 'upstream' });
+      const r = await api.ai(body, uid);
+      return reply(r.status || 200, r.body);
+    }
     return reply(404, { message: `mock: no route for ${method} ${p}` });
   }
-  return { fetch, users, docs, tokens, callLog, confirm: (email) => { const x = users.get(email); if (x) x.confirmed = true; } };
+  const api = { fetch, users, docs, tokens, callLog, ai: null, aiCalls: [], confirm: (email) => { const x = users.get(email); if (x) x.confirmed = true; } };
+  return api;
 }

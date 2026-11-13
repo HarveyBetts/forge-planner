@@ -139,3 +139,15 @@ GitHub Action (`deploy-ai.yml`) because Harvey has no computer with the Supabase
 two repository secrets exist. Deployed with `--no-verify-jwt` because the function verifies the token itself with Supabase Auth
 (the gateway check doesn't accept the newer asymmetric JWT keys). *Reverse:* change the model/effort with secrets; remove
 `fallbacks`/`betas` in `buildModelRequest` to turn the fallback off; deploy by CLI instead of the Action.
+
+**D27 — Ask Forge: a chat screen under Plan; proposals are opt-in diffs; the conversation is never stored.** The AI planner is a
+sub-route of Plan (`#ask`, entry card under the hero, plus a row in Settings) rather than a sixth tab: it's a way of changing
+the plan, not a separate area. The AI's suggestions arrive as tickable rows (valid ones ticked by default) with the plan's
+headline numbers before → after for exactly the ticked set, computed by the same engine and diff as the event editor; nothing
+is saved until **Add to my plan**, and **Undo** restores the previous events and answers. A suggestion with a missing figure
+can't be added blind: it shows the engine's own problem text and a **Fill in** button that opens the normal event editor
+prefilled. Events added this way are marked `source:'ai'`, and any figure the AI guessed keeps an "estimate" tag on the Plan
+until the event is edited (CLAUDE.md §3.1). The conversation lives in memory only (privacy; nothing to sync or leak); the last
+3 exchanges go with each question so follow-ups make sense. Only the plan as answers + events build it is sent (no generated
+rows, no budget/bank data), plus a short summary of the engine's own results so the AI doesn't redo the maths. *Reverse:*
+persist the thread in settings if Harvey wants history; move the entry point to a tab if it earns one.

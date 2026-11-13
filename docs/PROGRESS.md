@@ -562,3 +562,23 @@ and the Anthropic API: **16/16 PASS** (beta header sent, key only in a header, c
 index.ts` clean. `npm run test:rls` → **14/14 PASS**. No real Anthropic call was made (no key in this environment).
 **Needs Harvey's eyes:** H5 when you want the AI on (needs H3 first). The first real answer is the true test.
 
+## 2026-11-13 T5.2 — Ask Forge: AI chat with accept-to-apply proposals (mocked function)
+**Changed:** `src/ai/planner.js` (pure): request body (question ≤ 2,000 chars, plan as answers + events build it, engine summary,
+last 3 exchanges), readable rows for each proposed change (engine `eventProblems` + question bounds), apply-only-accepted
+(never mutates; AI events tagged `source:'ai'` + `assumed`), answer text → paragraphs/bullets (escaped on render).
+`sb.askPlanner()` → `/functions/v1/planner-ai` with the signed-in token. App: **Ask Forge** screen (`#ask`, under Plan): honest
+empty states (not set up / sign in / answers missing), suggestion chips, chat bubbles, typing dots, composer that stays above
+the tab bar and hides the bar while typing, proposal card with tickable rows, live "If you add these…" before → after,
+**Add to my plan** / **Not now**, **Undo**, **Fill in** for suggestions missing a figure; errors for the daily limit, expired
+sign-in and network (with Try again and the question restored). Plan: Ask Forge entry card; AI-guessed figures show an
+"estimate" tag on life events. Settings: AI planner row. Privacy page and README updated (sync + AI are opt-in; exactly what
+is sent). Mock Supabase gained a planner-ai stand-in.
+**Verified:** `tests/ai-planner.test.js` (7, incl. the real client → real handler round trip behind the mock Supabase);
+`tests/e2e/ask.spec.js` (5) at iPhone size: not-set-up state with no dead entry points; sign-in gate → chat; ask → answer +
+bullets → both changes ticked with before/after → untick one → only the trip is saved and retirement age stays 55 → follow-up
+carries history and clears the box → Undo restores → re-add shows on the Plan; missing figure → can't add, Fill in opens the
+editor prefilled; daily limit (no retry) and 502 (retry works, question restored). axe WCAG AA clean on the proposal screen in
+light and dark. Screenshots: `artifacts/ask-empty.png`, `artifacts/ask-proposal.png`. No horizontal overflow.
+**Needs Harvey's eyes:** after H3 + H5 — ask a real question on your phone. Check the composer and keyboard feel (logic-validated,
+not device-verified: the tab bar hides while typing so the box sits above the keyboard).
+

@@ -34,6 +34,7 @@ import { weekVsPlan, overPlan, setPlan, flagLevel } from './budget/plan.js';
 import { supabaseConfig } from './config.js';
 import { createSupabase } from './data/supabase.js';
 import { createSync } from './data/sync.js';
+import { askBody, planForAI, summaryFrom, describeChange, applyChanges, answerBlocks, SUGGESTIONS, MAX_QUESTION } from './ai/planner.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -70,9 +71,10 @@ function go(next, dir = 'fwd') {
 }
 function render(dir = 'fwd', opts = {}) {
   quiet = !!opts.quiet;
+  document.body.classList.remove('kb-open');
   const screens = { welcome: welcomeHTML, question: questionHTML, review: reviewHTML, plan: planHTML,
     timeline: timelineHTML, budget: budgetHTML, scenarios: scenariosHTML, settings: settingsHTML, paste: pasteHTML,
-    privacy: privacyHTML, advice: adviceHTML };
+    privacy: privacyHTML, advice: adviceHTML, ask: askHTML };
   applyTheme(settingsFromAnswers(state.answers).theme);
   let html;
   try {
@@ -387,6 +389,8 @@ const CHIP_ICON = {
 };
 let planAnimated = false; // count-up + ring fill on the first Plan view of a session only (DESIGN: first load)
 
+// Events the AI planner suggested with figures it guessed keep an "estimate" tag until you edit them (CLAUDE.md §3.1).
+const guessed = (id) => { const ev = id && userEvents.find((x) => x.id === id); return !!(ev && Array.isArray(ev.assumed) && ev.assumed.length); };
 function planHTML() {
   const P = computePlan();
   if (!P.scenario) return reviewHTML();
@@ -409,6 +413,7 @@ function planHTML() {
         <p class="sub">${esc(D.message)}</p>
         <p class="mini">${m(s.openingPot)} saved now · ${D.glide.needToday > 0 ? `${m(D.glide.needToday)} needed today to stay on plan` : 'your future saving covers the target'}</p>
       </section>
+      ${askCtaHTML()}
       ${checkinCardHTML(D)}
       ${realityHTML(s)}
       <section class="card free ${D.free.amount > 0 ? 'has' : ''}">
@@ -428,7 +433,7 @@ function planHTML() {
       </section>
       ${levers ? leversHTML(levers, s, m) : ''}
       <section class="card"><h2 class="rv-h">Life events in your plan</h2>${events.length ? `<ul class="ev">${events.map((e) =>
-        `<li${e.eventId ? ` class="ev-user" data-act="ev-edit" data-val="${esc(e.eventId)}" role="button" tabindex="0"` : ''}><span class="ev-d">${monthLabel(e.at)}</span><span class="ev-n">${esc(e.name)}</span><span class="ev-a ${e.amt < 0 ? 'neg' : ''}">${money(e.amt, cur, { compact: true })}${e.per || ''}</span></li>`).join('')}</ul>` : '<p class="mini">Nothing dated yet.</p>'}
+        `<li${e.eventId ? ` class="ev-user" data-act="ev-edit" data-val="${esc(e.eventId)}" role="button" tabindex="0"` : ''}><span class="ev-d">${monthLabel(e.at)}</span><span class="ev-n">${esc(e.name)}${guessed(e.eventId) ? ' <span class="tag">estimate</span>' : ''}</span><span class="ev-a ${e.amt < 0 ? 'neg' : ''}">${money(e.amt, cur, { compact: true })}${e.per || ''}</span></li>`).join('')}</ul>` : '<p class="mini">Nothing dated yet.</p>'}
         <button class="link-btn" data-act="ev-add">+ Add a life event</button></section>
       ${P.notPlaced.length ? `<section class="card"><h2 class="rv-h">Not in the plan yet</h2><ul class="bul">${P.notPlaced.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></section>` : ''}
       <details class="card disc"><summary><span class="rv-h">Assumptions</span><span class="disc-n">${assumptions.length}</span><svg class="disc-c" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10l4 4 4-4"/></svg></summary>
@@ -701,7 +706,7 @@ function scrubAnimate(target) {
   };
   tlAnim = requestAnimationFrame(step);
 }
-app.addEventListener('input', (e) => { if (e.target.matches && e.target.matches('.sc-range')) { cancelAnimationFrame(tlAnim); tlTarget = null; scrubTo(Number(e.target.value)); } });
+app.addEventListener('input', (e) => { if (e.target.id === 'ask-q') { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'; return; } if (e.target.matches && e.target.matches('.sc-range')) { cancelAnimationFrame(tlAnim); tlTarget = null; scrubTo(Number(e.target.value)); } });
 // Touching the slider stops any running spring, so the thumb never moves under your finger.
 app.addEventListener('pointerdown', (e) => { if (e.target.matches && e.target.matches('.sc-range')) { cancelAnimationFrame(tlAnim); tlTarget = null; } });
 // Let go within 4 months of a moment → snap onto it (markers are visual; the slider takes every touch).
@@ -1130,6 +1135,164 @@ function openAddLot() {
 // ---------------- scenarios: what-ifs + compare (T2.7) ----------------
 // A what-if = your answers with a few changes (kids, stop-work age, retirement spend, investing now) and, optionally,
 // the life events you added. Stored in settings.whatifs (so they're in backups).
+// ---------------- Ask Forge: the AI planner (T5.2) ----------------
+// Questions go to the planner-ai edge function (never straight to Anthropic, no key on the phone). The AI only
+// PROPOSES changes: each is shown with the plan's numbers before → after, and nothing changes until "Add to my
+// plan" (with Undo). The conversation lives in memory only — it's gone when the app is closed.
+let askThread = [];   // { role:'user', text } | { role:'assistant', text, proposal, picks, done, handed } | { role:'error', text, q }
+let askBusy = false;
+let askUndo = null;   // { events, answers, i } — the plan as it was before the last "Add to my plan"
+let askFresh = -1;    // index of the message to animate in (only the newest, only once — never on refresh)
+
+function askSummary() {
+  const P = computePlan();
+  return P.s ? summaryFrom(P) : {};
+}
+const ASK_ICON = '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>';
+function askCtaHTML() {
+  if (!sbCfg) return '';
+  return `<a class="card ask-cta" href="#ask"><span class="ask-ic" aria-hidden="true"><svg viewBox="0 0 24 24">${ASK_ICON}</svg></span>
+    <span class="ask-t"><span class="ask-h">Ask Forge</span><span class="mini">“What if I move back to the UK in 2028?”</span></span><span class="row-c" aria-hidden="true">›</span></a>`;
+}
+
+// Proposed changes with live "before → after" numbers for the ticked ones.
+function proposalHTML(msg, i) {
+  const cur = base();
+  const rows = msg.proposal.changes.map((c, j) => {
+    const d = describeChange(c, { currency: cur, answers: state.answers });
+    const bad = d.problems.length > 0;
+    const on = !bad && msg.picks[j];
+    const est = d.estimate.length ? `<span class="tag" title="Forge's AI guessed: ${esc(d.estimate.join(', '))}">estimate</span>` : '';
+    const body = `<span class="pr-tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>
+      <span class="pr-txt"><span class="pr-t">${esc(d.title)}${est}</span>${d.detail ? `<span class="pr-d">${esc(d.detail)}</span>` : ''}
+      ${d.estimate.length ? `<span class="pr-n">Guessed by the AI: ${esc(d.estimate.join(', '))} — check before relying on it.</span>` : ''}
+      ${bad ? `<span class="pr-n warn">${esc(d.problems[0])}</span>` : ''}</span>`;
+    if (msg.done) return `<li class="pr-row${on ? ' on' : ''}">${body}</li>`;
+    if (bad) {
+      return `<li class="pr-row bad">${body}${c.kind === 'addEvent' && FORMS[c.template] ? `<button class="btn small" data-act="ask-fill" data-val="${i}:${j}">${msg.handed && msg.handed[j] ? 'Opened' : 'Fill in'}</button>` : ''}</li>`;
+    }
+    return `<li><button class="pr-row${on ? ' on' : ''}" data-act="ask-pick" data-val="${i}:${j}" aria-pressed="${on}">${body}</button></li>`;
+  }).join('');
+  const picked = msg.proposal.changes.filter((c, j) => msg.picks[j] && !describeChange(c, { currency: cur, answers: state.answers }).problems.length);
+  let impact = '';
+  if (msg.done) {
+    impact = `<p class="pr-done" role="status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg>Added to your plan</p>
+      ${msg.done.length ? `<ul class="bul">${msg.done.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}
+      ${askUndo && askUndo.i === i ? `<button class="link-btn" data-act="ask-undo">Undo</button>` : ''}`;
+  } else if (picked.length) {
+    const next = applyChanges({ events: userEvents, answers: state.answers }, picked, { base: cur, newId: (ev) => newEventId(ev) });
+    let lines = [];
+    try { const { s } = buildScenario(next.events, next.answers); lines = s ? diffSnapshots(planSnap(), planSnapshot(s, projectScenario(s)), { currency: cur }) : []; } catch { lines = []; }
+    impact = `<h3 class="pr-h">If you add ${picked.length === 1 ? 'it' : `these ${picked.length}`}</h3>${lines.length ? `<ul class="bul">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : '<p class="mini">Your plan’s headline numbers wouldn’t change.</p>'}`;
+  }
+  return `<section class="card prop" data-prop="${i}"><h2 class="rv-h">Suggested change${msg.proposal.changes.length === 1 ? '' : 's'}</h2>
+    ${msg.proposal.summary ? `<p class="mini">${esc(msg.proposal.summary)}</p>` : ''}
+    <ul class="pr-list">${rows}</ul>${impact}
+    ${msg.done ? '' : `<div class="pr-actions"><button class="btn ghost" data-act="ask-dismiss" data-val="${i}">Not now</button><button class="btn primary" data-act="ask-accept" data-val="${i}" ${picked.length ? '' : 'disabled'}>Add to my plan</button></div>`}
+  </section>`;
+}
+
+function askMsgHTML(msg, i) {
+  const nw = i === askFresh ? ' new' : '';
+  if (msg.role === 'user') return `<div class="msg me${nw}"><p>${esc(msg.text)}</p></div>`;
+  if (msg.role === 'error') return `<div class="msg err${nw}" role="alert"><p>${esc(msg.text)}</p>${msg.q ? `<button class="btn small" data-act="ask-retry" data-val="${i}">Try again</button>` : ''}</div>`;
+  const blocks = answerBlocks(msg.text).map((b) => (b.type === 'ul' ? `<ul>${b.items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : `<p>${esc(b.text)}</p>`)).join('');
+  return `<div class="msg ai${nw}">${blocks}</div>${msg.proposal && !msg.dismissed ? proposalHTML(msg, i).replace('class="card prop"', `class="card prop${nw}"`) : ''}`;
+}
+
+function askHTML() {
+  const bar = `<header class="bar"><a class="icon-btn" href="#plan" aria-label="Back to your plan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a><h1 class="h2">Ask Forge</h1><span style="width:44px"></span></header>`;
+  const empty = (title, text, action = '') => `${bar}<div class="wrap"><section class="card empty"><span class="empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24">${ASK_ICON}</svg></span>
+    <h2 class="h3">${title}</h2><p class="sub">${text}</p>${action}</section></div>`;
+  if (!sbCfg) return empty('The AI planner isn’t switched on yet', 'It runs through your own Forge account, so the AI key never sits on your phone. Setting it up takes two steps in the README (HUMAN_TODO H3 and H5).');
+  if (!sb || !sb.signedIn()) return empty('Sign in to ask', 'The AI planner uses your Forge account, so only you can use your daily questions.', '<button class="btn primary" data-act="acct-open">Sign in or create an account</button>');
+  if (!planReady()) return needAnswersHTML('Ask Forge');
+  const thread = askThread.map(askMsgHTML).join('');
+  askFresh = -1;
+  const intro = askThread.length ? '' : `<p class="sub">Ask anything about your plan — what-ifs, timing, trade-offs. If a change helps, Forge suggests it and you choose whether to add it.</p>
+    <div class="ask-sugg">${SUGGESTIONS.map((s) => `<button class="btn small" data-act="ask-suggest" data-val="${esc(s)}">${esc(s)}</button>`).join('')}</div>`;
+  return `${bar}<div class="wrap ask">
+    ${intro}
+    <div class="thread" aria-live="polite">${thread}${askBusy ? '<div class="msg ai typing" role="status" aria-label="Forge is thinking"><span></span><span></span><span></span></div>' : ''}</div>
+    <form class="composer" data-ask novalidate>
+      <label class="sr" for="ask-q">Your question</label>
+      <textarea class="in" id="ask-q" name="q" rows="1" maxlength="${MAX_QUESTION}" enterkeyhint="send" placeholder="Ask about your plan…" ${askBusy ? 'disabled' : ''}></textarea>
+      <button type="button" class="send" data-act="ask-send" aria-label="Send" ${askBusy ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+    </form>
+    <p class="foot">Your plan’s figures (not your budget or bank data) are sent to Anthropic’s Claude through Forge’s server. <a href="#advice">Estimates, not financial advice.</a></p>
+  </div>`;
+}
+
+function askRefresh(scrollToEnd = true) {
+  if (screen.name !== 'ask') return;
+  const draft = app.querySelector('#ask-q');
+  const keep = draft ? draft.value : '';
+  render('none', { quiet: true, keepScroll: true });
+  const q = app.querySelector('#ask-q');
+  if (q && keep) q.value = keep;
+  if (scrollToEnd) { const last = app.querySelector('.thread > :last-child'); if (last) last.scrollIntoView({ block: 'end', behavior: reduceMotion() ? 'auto' : 'smooth' }); }
+}
+
+async function askSend(question) {
+  if (askBusy) return;
+  const { s, out } = buildScenario();
+  const history = askThread.filter((m) => m.role === 'user' || m.role === 'assistant');
+  const r = askBody({ question, scenario: planForAI(out.scenario, userEvents), summary: askSummary(), history });
+  if (r.error || !s) { toast(r.error || 'Finish the quick-start questions first.'); return; }
+  askThread = [...askThread.filter((m) => m.role !== 'error'), { role: 'user', text: r.body.question }];
+  askFresh = askThread.length - 1;
+  askBusy = true;
+  { const ta = app.querySelector('#ask-q'); if (ta) ta.value = ''; }
+  askRefresh();
+  try {
+    const res = await sb.askPlanner(r.body);
+    const proposal = res && res.proposal && Array.isArray(res.proposal.changes) && res.proposal.changes.length ? res.proposal : null;
+    askThread = [...askThread, { role: 'assistant', text: String(res.answer || ''), proposal,
+      picks: proposal ? proposal.changes.map((c) => !describeChange(c, { currency: base(), answers: state.answers }).problems.length) : [] }];
+    askFresh = askThread.length - 1;
+  } catch (e) {
+    const text = e.code === 'daily_cap' ? e.message : e.status === 401 ? 'Your sign-in has expired. Sign in again from Settings → Sync & account.'
+      : e.status >= 400 && e.status < 500 && e.message ? e.message : 'Couldn’t reach Forge’s AI. Check your connection and try again.';
+    askThread = [...askThread.slice(0, -1), { role: 'error', text, q: e.code === 'daily_cap' || e.status === 401 ? null : r.body.question }];
+    askFresh = askThread.length - 1;
+    if (e.code !== 'daily_cap' && e.status !== 401) {
+      const ta = () => app.querySelector('#ask-q');
+      askBusy = false; askRefresh(); if (ta()) ta().value = r.body.question; return;
+    }
+  }
+  askBusy = false;
+  askRefresh();
+}
+
+async function askAccept(i) {
+  const msg = askThread[i];
+  if (!msg || !msg.proposal || msg.done) return;
+  const cur = base();
+  const picked = msg.proposal.changes.filter((c, j) => msg.picks[j] && !describeChange(c, { currency: cur, answers: state.answers }).problems.length);
+  if (!picked.length) return;
+  const before = planSnap();
+  askUndo = { events: userEvents, answers: state.answers, i };
+  const next = applyChanges({ events: userEvents, answers: state.answers }, picked, { base: cur, newId: (ev) => newEventId(ev) });
+  if (next.answers !== state.answers) state = store.save({ ...state, answers: next.answers });
+  await saveUserEvents(next.events);
+  const lines = diffSnapshots(before, planSnap(), { currency: cur });
+  msg.done = lines;
+  askRefresh(false);
+  toast(`Added to your plan${lines.length ? ' — ' + lines[0] : ''}`);
+}
+
+async function askUndoLast() {
+  if (!askUndo) return;
+  const { events, answers, i } = askUndo;
+  askUndo = null;
+  state = store.save({ ...state, answers });
+  await saveUserEvents(events);
+  if (askThread[i]) delete askThread[i].done;
+  askRefresh(false);
+  toast('Undone — your plan is as it was');
+}
+
+// ---------------- what-ifs (T2.7) ----------------
 const whatIfs = () => (Array.isArray(appSettings.whatifs) ? appSettings.whatifs : []);
 function summaryFor(answers, events, name) {
   const { s } = buildScenario(events, answers);
@@ -1250,6 +1413,12 @@ function settingsHTML() {
     ${prefsHTML()}
     ${assumptionsHTML()}
     ${accountHTML()}
+    <section class="card list"><h2 class="list-h">AI planner</h2>
+      ${sbCfg ? `<a class="row" href="#ask"><span class="row-l">Ask Forge</span><span class="row-v">${sb && sb.signedIn() ? 'Ready' : 'Sign in first'}</span><span class="row-c" aria-hidden="true">›</span></a>
+      <p class="list-note">Questions and your plan’s figures go to Anthropic’s Claude through Forge’s server — never your budget, bank data or account numbers. A daily limit keeps costs down. The AI only suggests; nothing changes until you tap “Add to my plan”.</p>`
+      : `<div class="row"><span class="row-l">Ask Forge</span><span class="row-v">Not set up</span></div>
+      <p class="list-note">Needs sync (H3) and the AI function (H5) — steps in the README.</p>`}
+    </section>
     <section class="card list"><h2 class="list-h">Your data</h2>
       <button class="row" data-act="export"><span class="row-l">Back up everything</span><span class="row-v">answers, events, budget</span><span class="row-c" aria-hidden="true">›</span></button>
       <label class="row as-label"><span class="row-l">Restore from a backup</span><span class="row-c" aria-hidden="true">›</span><input type="file" accept="application/json,.json" data-act="import" hidden></label>
@@ -1345,7 +1514,7 @@ const backBar = (title) => `<header class="bar"><a class="icon-btn" href="#setti
 function privacyHTML() {
   return `${backBar('Privacy')}<div class="wrap doc">
     <section class="card"><h2 class="h3">The short version</h2><ul class="bul">
-      <li>Everything you put into Forge stays <b>on this phone</b>. There’s no account and nothing is uploaded.</li>
+      <li>Everything you put into Forge stays <b>on this phone</b> unless you turn on sync or ask the AI planner a question — both optional, both need you to sign in.</li>
       <li>Forge never asks for bank logins. Bank data only comes in as files you choose to import.</li>
       <li>No adverts, no tracking, no analytics.</li></ul></section>
     <section class="card"><h2 class="h3">What’s stored on this phone</h2><ul class="bul">
@@ -1356,11 +1525,13 @@ function privacyHTML() {
     <section class="card"><h2 class="h3">What leaves the phone</h2><ul class="bul">
       <li><b>Exchange rates</b>: Forge asks open.er-api.com for today’s rates. The request contains no personal data.</li>
       <li><b>Fonts</b>: the Inter and Sora fonts load from Google Fonts, which sees your device’s IP address, like any website visit.</li>
-      <li><b>Spreadsheets and bank CSVs</b> you import are read on the phone and never sent anywhere.</li></ul></section>
+      <li><b>Spreadsheets and bank CSVs</b> you import are read on the phone and never sent anywhere.</li>
+      <li><b>Sync</b> (only if you sign in): your answers, events, budget, check-ins and settings are copied to your own Forge database (Supabase), locked so only your account can read them.</li>
+      <li><b>Ask Forge</b> (only when you send a question): the question and your plan’s figures — ages, amounts, life events, assumptions — go through Forge’s server to Anthropic’s Claude to write the answer. Never your budget, transactions, bank data or account numbers. Forge keeps no copy of the conversation; it’s gone when you close the app.</li></ul></section>
     <section class="card"><h2 class="h3">Your data, your call</h2><ul class="bul">
       <li><b>Export</b>: Settings → Back up everything gives you one file with all of it.</li>
       <li><b>Delete</b>: Settings → Delete all my data wipes it from this phone.</li>
-      <li>If syncing between devices is ever added, it will be opt-in, and only you will be able to read your data.</li></ul>
+      <li><b>Delete your account</b>: Settings → Sync & account → Delete my account removes the cloud copy (what’s on the phone stays).</li></ul>
       <div class="stack"><button class="btn" data-act="export">Back up everything</button><a class="btn" href="#settings">Back to Settings</a></div></section>
   </div>`;
 }
@@ -1605,6 +1776,24 @@ app.addEventListener('click', (e) => {
   if (act === 'crash-answers') { screen = { name: 'review' }; if (location.hash === '#answers') render('fwd'); else location.hash = '#answers'; return; }
   if (act === 'set-num') return openNumberSetting(val);
   if (act === 'acct-open') return openAccount();
+  if (act === 'ask-send') { const q = app.querySelector('#ask-q'); if (q) askSend(q.value); return; }
+  if (act === 'ask-suggest') return askSend(val);
+  if (act === 'ask-retry') { const m = askThread[Number(val)]; if (m && m.q) askSend(m.q); return; }
+  if (act === 'ask-pick') { const [i, j] = val.split(':').map(Number); const m = askThread[i]; if (m && !m.done) { m.picks[j] = !m.picks[j]; askRefresh(false); } return; }
+  if (act === 'ask-accept') return askAccept(Number(val));
+  if (act === 'ask-dismiss') { const m = askThread[Number(val)]; if (m) m.dismissed = true; askRefresh(false); return; }
+  if (act === 'ask-undo') return askUndoLast();
+  if (act === 'ask-fill') {
+    const [i, j] = val.split(':').map(Number);
+    const m = askThread[i], c = m && m.proposal && m.proposal.changes[j];
+    if (!c || !FORMS[c.template]) return;
+    editing = { template: c.template, id: null };
+    const params = { ...c.params, ...(c.name && !c.params.name ? { name: c.name } : {}) };
+    openSheet({ html: formHTML(c.template, eventToForm({ template: c.template, params }), false), label: 'Add a life event', onClick: sheetClick, onInput: () => previewEvent(false) });
+    previewEvent(false);
+    m.handed = { ...(m.handed || {}), [j]: true };
+    return;
+  }
   if (act === 'acct-sync') { runSync().then(() => toast(sync.status.error ? 'Couldn’t sync — will retry' : 'Synced')); return; }
   if (act === 'acct-signout') { sb.signOut().then(() => { sync.forget(); render('none', { keepScroll: true }); toast('Signed out — your data is still on this phone'); }); return; }
   if (act === 'acct-delete') {
@@ -1649,7 +1838,10 @@ app.addEventListener('change', (e) => {
   }).catch((err) => alertInline(err.message || 'Couldn’t read that file.'));
 });
 
+app.addEventListener('focusin', (e) => { if (e.target.id === 'ask-q') document.body.classList.add('kb-open'); });
+app.addEventListener('focusout', (e) => { if (e.target.id === 'ask-q') document.body.classList.remove('kb-open'); });
 app.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.id === 'ask-q') { e.preventDefault(); askSend(e.target.value); return; }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('.be')) { e.preventDefault(); e.target.blur(); return; }
   // Rows that act like buttons (role="button") respond to Enter and Space, like real buttons (T6.2).
   if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute && e.target.getAttribute('role') === 'button' && e.target.tagName !== 'BUTTON') { e.preventDefault(); e.target.click(); return; }

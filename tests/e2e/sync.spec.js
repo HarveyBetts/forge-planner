@@ -124,5 +124,5 @@ test('wrong password shows a readable message; not configured shows the honest â
   // default app (no config): device-only
   await prepare(page); await fresh(page); await seedAnswers(page, ANSWERS); await page.goto('/#settings'); await page.reload();
   await expect(page.getByText('Sync between devices')).toBeVisible();
-  await expect(page.getByText('Not set up')).toBeVisible();
+  await expect(page.locator('.list', { hasText: 'Sync & account' }).getByText('Not set up')).toBeVisible();
 });

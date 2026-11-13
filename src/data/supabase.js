@@ -28,6 +28,7 @@ export function createSupabase({ url, anonKey, fetch: doFetch = (...a) => global
       const msg = (data && (data.error_description || data.msg || data.message || data.error)) || `Request failed (${res.status})`;
       const e = new Error(String(msg).replace(/(eyJ|sb_)[A-Za-z0-9._-]+/g, '…'));
       e.status = res.status;
+      if (data && typeof data.code === 'string') e.code = data.code;
       throw e;
     }
     return data;
@@ -83,6 +84,9 @@ export function createSupabase({ url, anonKey, fetch: doFetch = (...a) => global
       return (rows && rows[0] && rows[0].updated_at) || updatedAt;
     },
     async removeAllDocs() { await call('/rest/v1/user_docs?key=not.is.null', { method: 'DELETE' }); },
+    // The AI planner (T5.2): the planner-ai edge function checks the sign-in, the daily cap and sizes; the
+    // Anthropic key never leaves the server. body: { question, scenario, summary, history } (src/ai/planner.js).
+    async askPlanner(body) { return call('/functions/v1/planner-ai', { method: 'POST', body }); },
   };
   return api;
 }
