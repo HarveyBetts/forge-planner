@@ -21,7 +21,7 @@ Phases 0–3 need nothing from Harvey except a GitHub repo to push to. Everythin
 - [x] **T1.7** Scenario JSON schema validation (`docs/SPEC.md`), versioned, with migration stub. Accept: invalid inputs produce readable errors.
 
 ## Phase 2 — UI (mobile-first, Slate design, demo mode)
-- [ ] **T2.1** App shell: router (hash routes; only plain `#name`), bottom nav (Plan · Timeline · Budget · Scenarios · Settings), safe-area handling, dark mode, reduced-motion. Accept: screenshot at iPhone viewport.
+- [x] **T2.1** App shell: router (hash routes; only plain `#name`), bottom nav (Plan · Timeline · Budget · Scenarios · Settings), safe-area handling, dark mode, reduced-motion. Accept: screenshot at iPhone viewport.
 - [x] **T2.2** Onboarding on first launch — 146 questions (32 ★ quick start), save + resume, review/edit, export/import, answers → starter plan. Built in the handover; see docs/ONBOARDING.md.
 - [x] **T2.2a** Move `tests/e2e/onboarding.walk.mjs` into the T0.2 Playwright suite and run it in CI. Accept: CI green with the walk + screenshots uploaded as an artifact.
 - [ ] **T2.2b** Map the remaining answers into the scenario (training cost/loan q14–q16, parental leave q76, mortgage + buying costs q99–q100, university q87, school-fee inflation q92, car running q111, captain q21, UK return q3). Accept: a test per mapping asserting exact months/amounts; anything unmappable stays in `notPlaced`.

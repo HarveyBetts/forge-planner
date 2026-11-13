@@ -10,6 +10,8 @@ import { renderInput, readInput } from './onboarding/inputs.js';
 import { esc, money, monthLabel, currentMonth, summarize, ageLabel, pct } from './ui/format.js';
 import { createFx, fxBadge } from './fx/fx.js';
 import { whatMustBeTrue } from './engine/solve.js';
+import { ROUTES, parseRoute, tabOf, slideDir, syncTabBar } from './ui/shell.js';
+import { milestones } from './ui/milestones.js';
 import {
   projectScenario, projectFan, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -28,20 +30,50 @@ const base = () => (state.answers.q7 && state.answers.q7.v) || 'GBP';
 const reduceMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 
 // ---------------- navigation ----------------
+// Once onboarding is finished the app lives in a shell (bottom tabs + hash routes, src/ui/shell.js).
+// Route names map to screen names 1:1 except #answers → the review screen.
+const ROUTE_SCREEN = { answers: 'review' };
+const SCREEN_ROUTE = { review: 'answers' };
+const routeOf = (name) => SCREEN_ROUTE[name] || name;
+const inShell = (name) => !!state.completedAt && ROUTES.includes(routeOf(name));
+let lastRoute = null;
+
 function go(next, dir = 'fwd') {
+  if (inShell(next.name)) {
+    const h = '#' + routeOf(next.name);
+    if (location.hash !== h) { location.hash = h; return; } // the hashchange handler renders it
+  }
   screen = next;
   render(dir);
 }
 function render(dir = 'fwd', opts = {}) {
   quiet = !!opts.quiet;
-  const html = ({ welcome: welcomeHTML, question: questionHTML, review: reviewHTML, plan: planHTML })[screen.name]();
+  const screens = { welcome: welcomeHTML, question: questionHTML, review: reviewHTML, plan: planHTML,
+    timeline: timelineHTML, budget: budgetHTML, scenarios: scenariosHTML, settings: settingsHTML };
+  const html = screens[screen.name]();
   app.innerHTML = `<main class="screen in-${dir}" id="main">${html}</main>`;
   const main = app.firstElementChild;
-  main.scrollTop = 0;
-  window.scrollTo(0, 0);
+  const shell = inShell(screen.name);
+  syncTabBar(routeOf(screen.name), shell);
+  lastRoute = shell ? routeOf(screen.name) : null;
+  if (!opts.keepScroll) window.scrollTo(0, 0);
   if (screen.name === 'question') focusFirst(main);
   if (screen.name === 'plan' && !quiet) animatePlan(main);
 }
+window.addEventListener('hashchange', () => {
+  const r = parseRoute(location.hash);
+  if (!r || !state.completedAt) return;
+  const dir = slideDir(lastRoute, r);
+  screen = { name: ROUTE_SCREEN[r] || r };
+  render(reduceMotion() ? 'none' : dir);
+});
+// Tapping the tab you're already on scrolls to the top (iOS behaviour).
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('#tabbar .tb');
+  if (!a || tabOf(lastRoute) !== a.dataset.tab || lastRoute !== a.dataset.tab) return;
+  e.preventDefault();
+  window.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' });
+});
 function focusFirst(root) {
   const el = root.querySelector('input.in:not([type=hidden]), textarea.in, select.in');
   // Don't pop the iPhone keyboard for choice questions; do it for typed answers.
@@ -330,6 +362,73 @@ function chart(res, cur) {
   </figure>`;
 }
 
+// ---------------- timeline (v0: milestone list; T2.5 adds the scrubber) ----------------
+function needAnswersHTML(title) {
+  return `<header class="bar"><h1 class="h2">${title}</h1></header><div class="wrap">
+    <section class="card empty"><span class="empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.5M12 16v.2"/></svg></span>
+    <h2 class="h3">A few answers missing</h2><p class="sub">Forge needs your date of birth, retirement age and retirement spend to draw this.</p>
+    <a class="btn primary" href="#answers">Go to your answers</a></section></div>`;
+}
+function timelineHTML() {
+  const P = computePlan();
+  if (!P.scenario) return needAnswersHTML('Timeline');
+  const cur = P.s.baseCurrency;
+  const list = milestones(P.s, P.res);
+  return `<header class="bar"><h1 class="h2">Timeline</h1></header>
+    <div class="wrap">
+      <p class="sub">Your life stages and big moments, with your projected pot at each (middle case, today’s money).</p>
+      <ol class="tl">${list.map((m) => `<li class="tl-i k-${m.kind}${m.warn ? ' warn' : ''}${m.after ? ' after' : ''}">
+        <span class="tl-dot" aria-hidden="true"></span>
+        <div class="tl-b"><span class="tl-d">${monthLabel(m.at)} · age ${Math.floor(m.age)}</span>
+        <span class="tl-l">${esc(m.label)}</span>
+        <span class="tl-m">${m.amount != null ? `<span class="${m.amount < 0 ? 'neg' : ''}">${money(m.amount, cur, { compact: true })}${m.per ? '/' + m.per : ''}</span>` : ''}${m.pot != null ? `<span>Pot ${m.pot < 0 ? 'short by ' + money(-m.pot, cur, { compact: true }) : money(m.pot, cur, { compact: true })}</span>` : m.after ? '<span>after you stop work</span>' : ''}</span></div></li>`).join('')}</ol>
+      <p class="foot">Estimates, not financial advice. All figures in today’s money.</p>
+    </div>`;
+}
+
+// ---------------- budget (Phase 3) ----------------
+function budgetHTML() {
+  return `<header class="bar"><h1 class="h2">Budget</h1></header><div class="wrap">
+    <section class="card empty"><span class="empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="13" rx="3"/><path d="M3.5 10h17M15.5 14.5h2"/></svg></span>
+    <h2 class="h3">Budgeting is next on the list</h2>
+    <p class="sub">Categories, planned vs actual, and importing a CSV from your bank (no bank logins, ever). It will show how much coasting frees up each month.</p></section>
+  </div>`;
+}
+
+// ---------------- scenarios (T2.7 adds duplicate + compare) ----------------
+function scenariosHTML() {
+  const P = computePlan();
+  if (!P.scenario) return needAnswersHTML('Scenarios');
+  const { s, res, status } = P;
+  const m = (x) => money(x, s.baseCurrency, { compact: true });
+  const label = { coasting: 'Coasting', 'on-track': 'On track', behind: 'Behind', short: 'Runs short' }[status];
+  return `<header class="bar"><h1 class="h2">Scenarios</h1></header><div class="wrap">
+    <a class="card scn" href="#plan"><span class="scn-t">Your plan</span><span class="scn-s">Built from your answers</span>
+      <span class="scn-k"><span>${label}</span><span>Target ${m(res.target)}</span><span>${res.coastDate ? 'Coast ' + monthLabel(res.coastDate) : 'No coast date yet'}</span></span></a>
+    <section class="card empty"><h2 class="h3">What-ifs, side by side</h2>
+    <p class="sub">Soon you’ll copy your plan into versions like “two children” or “back to the UK in 2028” and compare them. Until then, change an answer and the plan updates.</p></section>
+  </div>`;
+}
+
+// ---------------- settings (T2.8 adds currencies, assumptions, full backup) ----------------
+function settingsHTML() {
+  const full = progress(state.answers, 'full');
+  return `<header class="bar"><h1 class="h2">Settings</h1></header><div class="wrap">
+    <section class="card list"><h2 class="list-h">Your plan</h2>
+      <a class="row" href="#answers"><span class="row-l">Your answers</span><span class="row-v">${full.done} of ${full.total}</span><span class="row-c" aria-hidden="true">›</span></a>
+    </section>
+    <section class="card list"><h2 class="list-h">Your data</h2>
+      <button class="row" data-act="export"><span class="row-l">Export a backup</span><span class="row-c" aria-hidden="true">›</span></button>
+      <label class="row as-label"><span class="row-l">Import a backup</span><span class="row-c" aria-hidden="true">›</span><input type="file" accept="application/json,.json" data-act="import" hidden></label>
+      <button class="row danger" data-act="reset"><span class="row-l">${screen.confirmReset ? 'Tap again to delete all answers' : 'Start over'}</span></button>
+      <p class="list-note">Everything is stored on this device only${store.persistent ? '' : ' — and this browser isn’t saving it, so export a backup'}.</p>
+    </section>
+    <section class="card list"><h2 class="list-h">About</h2>
+      <p class="list-note">Forge is a planning tool. Estimates, not financial advice. All figures in today’s money.</p>
+    </section>
+  </div>`;
+}
+
 // ---------------- actions ----------------
 function download(name, text) {
   try {
@@ -404,8 +503,9 @@ app.addEventListener('click', (e) => {
   }
   if (act === 'export') return download(`forge-answers-${currentMonth()}.json`, exportAnswers(state));
   if (act === 'reset') {
-    if (!screen.confirmReset) { screen = { ...screen, confirmReset: true }; return render(); }
+    if (!screen.confirmReset) { screen = { ...screen, confirmReset: true }; return render('none', { keepScroll: true }); }
     state = store.reset();
+    try { history.replaceState(null, '', location.pathname + location.search); } catch { /* file:// etc. */ }
     return go({ name: 'welcome' }, 'back');
   }
 });
@@ -428,7 +528,13 @@ app.addEventListener('keydown', (e) => {
 });
 
 // ---------------- boot ----------------
-screen = state.completedAt ? (planReady() ? { name: 'plan' } : { name: 'review' }) : { name: 'welcome' };
+if (state.completedAt) {
+  const r = parseRoute(location.hash) || (planReady() ? 'plan' : 'answers');
+  screen = { name: ROUTE_SCREEN[r] || r };
+  try { if (location.hash !== '#' + r) history.replaceState(null, '', '#' + r); } catch { /* ignore */ }
+} else {
+  screen = { name: 'welcome' };
+}
 render('none');
 // Live FX in the background; if the plan is on screen and rates changed, refresh it in place.
 {
@@ -436,7 +542,7 @@ render('none');
   fx.ensure().then(() => {
     if (screen.name === 'plan' && JSON.stringify(fx.rates()) !== before) {
       const y = window.scrollY;
-      render('none', { quiet: true });
+      render('none', { quiet: true, keepScroll: true });
       window.scrollTo(0, y);
     }
   });

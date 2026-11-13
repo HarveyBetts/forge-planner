@@ -143,3 +143,20 @@ top-level field, retirement-in-the-past, assumptions wording, items (duplicate i
 non-objects) with paths, one-offs/pots/events, v0 migration (input not mutated), newer/negative versions refused,
 parseScenario on JSON text. Store tests extended for invalid scenarios in backups. `npm run check` → 128/128.
 **Needs Harvey's eyes:** nothing.
+
+## 2026-11-13 T2.1 — App shell
+**Changed:** `src/ui/shell.js` — plain `#name` hash routes (`#plan #timeline #budget #scenarios #settings` + `#answers`
+under Settings), bottom tab bar mounted once on `<body>` (outside the animating screen) with a sliding indicator,
+directional slides by tab position (drill-in forward, out back; none under reduced motion), tap-the-current-tab scrolls to
+top, safe-area padding, static (never animated) blur. `src/app.js` routes through the hash after onboarding; onboarding
+screens have no tab bar; deep links + reload land on the same tab; "Start over" clears the hash. New screens: **Timeline v0**
+(`src/ui/milestones.js`: today, Speedbird training start, First Officer, events, school starts, coast date, run-out warning,
+super unlock, stop-work, each with age and projected pot), **Budget** and **Scenarios** as designed, honest "coming next"
+states (no dead buttons), **Settings** as grouped rows (Your answers, export/import, start over, about). Onboarding now emits
+`marks` for training/FO start. Reset no longer replays the screen entrance.
+**Verified:** `tests/shell.test.js` (3): route parsing rejects anything but plain names, tab/sub-route mapping, slide
+directions, milestone order/ages/pots. `tests/e2e/shell.spec.js` (4): no tab bar in onboarding; all five tabs in **light and
+dark** (URL, heading, active tab, no overflow, screenshots `artifacts/shell-*-{light,dark}.png`); #answers keeps Settings lit;
+browser back; deep link + reload; last content clears the tab bar; start over → onboarding with tab bar hidden.
+`npm run check` → 131/131; e2e 8/8.
+**Needs Harvey's eyes:** tab bar feel on the iPhone (height, blur, home-indicator spacing), indicator slide, and the Timeline list.

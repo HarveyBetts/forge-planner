@@ -162,6 +162,9 @@ export function answersToScenario(answers, opts = {}) {
   const courseStart = speedbird ? v(answers, 'q12') : undefined;
   const foStart = courseStart ? addMonths(courseStart, DEFAULT_TRAINING_MONTHS) : undefined;
   if (courseStart) assumptions.push(`Training lasts ${DEFAULT_TRAINING_MONTHS} months from ${monthLabel(courseStart)}.`);
+  const marks = [];
+  if (courseStart) marks.push({ at: courseStart, label: 'Speedbird training starts' });
+  if (foStart) marks.push({ at: foStart, label: 'First Officer (reduced Speedbird scale)' });
 
   // Monthly investing as steps across life stages.
   const inv = v(answers, 'q50') || {};
@@ -281,6 +284,7 @@ export function answersToScenario(answers, opts = {}) {
     retirementAge,
     openingPot,
     pots,
+    marks,
     investShare: 1,
     redirectAfterCoast: v(answers, 'q57') === 'Spend more now once on track',
     assumptions: { nominalReturn, inflation: DEFAULT_INFLATION, withdrawalRate, retirementSpend, otherRetirementIncome },
