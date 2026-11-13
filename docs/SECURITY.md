@@ -20,5 +20,5 @@ Forge v2 must not inherit this.
 9. **Backups:** Harvey can export at any time; remind monthly at check-in.
 
 ## Verification checklist (Claude Code keeps this current)
-- [ ] two-user RLS test passes (T4.4)  - [ ] anon request returns nothing  - [x] `grep -r service_role` finds nothing in client code (checked 13 Nov: src/, index.html, sw.js)
+- [~] two-user RLS test passes (T4.4 — 11/11 locally; run H4 on the real project)  - [~] anon request returns nothing (same)  - [x] `grep -r service_role` finds nothing in client code (checked 13 Nov: src/, index.html, sw.js)
 - [x] CSP in place (`index.html` meta; connect-src self + open.er-api.com)  - [x] imported JSON validated (scenarios in backups: `src/engine/schema.js` via `parseBackup`)  - [ ] AI cap enforced in tests  - [ ] no personal data in `git ls-files`

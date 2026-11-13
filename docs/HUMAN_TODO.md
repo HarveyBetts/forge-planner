@@ -20,9 +20,14 @@ Only needed if you want your data on more than one device. Forge works fully wit
 6. In Forge: Settings → **Sync & account** → Create account (email + password) → your data uploads. On another phone: Sign in.
 Then do H4 once.
 
-## H4 — Verify the database is locked down (Phase 4, 5 min)
-Run the queries in `supabase/tests/rls.sql` (Claude Code writes it in T4.4) while signed in as two different test users.
-Each must see only their own rows; an anonymous request must see nothing.
+## H4 — Prove the database is locked down (after H3, 2 min)
+1. Supabase → **SQL Editor** → New query → paste the whole of `supabase/tests/rls.sql` → **Run**.
+2. You should see 11 rows, **every one saying PASS** (e.g. "B cannot read A's documents, even by id | PASS"). Nothing is changed:
+   the script creates two throwaway users inside a transaction and rolls everything back.
+3. If any row says FAIL, or the run errors, stop and send Claude a screenshot — don't sign in on the app until it's fixed.
+4. If it errors on "insert into auth.users": create two users in Authentication → Users → Add user (any emails), then replace the two
+   UUIDs at the top of the script (…000a and …000b) with theirs, and run it again.
+(Claude has run the same script against a local PostgreSQL with a Supabase stand-in: 11/11 PASS — `npm run test:rls`.)
 
 ## H5 — Deploy the AI function (Phase 5)
 Supabase CLI: `supabase functions deploy planner-ai` then set secrets:

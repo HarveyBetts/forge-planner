@@ -52,7 +52,7 @@ Harvey's own spreadsheet (budget + investments) defines this phase — see D23. 
 - [x] **T4.1** `SupabaseStore` implementing the T0.3 interface; config via a gitignored `config.local.js` / documented public config. Mock client for tests. Accept: contract tests run against both stores.
 - [x] **T4.2** Auth UI (magic link or email+password), session handling, sign-out, delete-account flow. Accept: mocked-auth e2e.
 - [x] **T4.3** Sync policy: local-first; push on change; per-scenario last-write-wins on `updated_at`; conflict toast. Accept: tests for offline edits then reconnect.
-- [ ] **T4.4** RLS verification script (`supabase/tests/rls.sql` + doc): two users cannot see/modify each other's rows; anon sees nothing. Accept: documented queries + expected results; mark `[~]` until Harvey runs it against the real project.
+- [~] **T4.4** RLS verification script (`supabase/tests/rls.sql` + doc): two users cannot see/modify each other's rows; anon sees nothing. Accept: documented queries + expected results; mark `[~]` until Harvey runs it against the real project. — Blocked on H3/H4: script written and passing 11/11 locally against PostgreSQL 16 + a Supabase stand-in; needs one run on the real project.
 
 ## Phase 5 — AI planner
 - [ ] **T5.1** Finish + test `supabase/functions/planner-ai` (mock Deno/fetch): auth required, daily cap enforced, input/output size caps, no key leakage in errors. Deploy is Harvey's step (H5).

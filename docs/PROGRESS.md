@@ -530,3 +530,15 @@ create account on A → answers + events uploaded; fresh phone B signs in from t
 event → A picks it up; delete account → cloud empty, A's data intact; a phone with different data is asked and "this phone's copy"
 wins; wrong password → "Invalid login credentials"; unconfigured app → "Not set up". `npm run check` → 251/251; e2e 48/48.
 **Needs Harvey's eyes:** only after H3 — create the account on your phone, then sign in on another device.
+
+## 2026-11-13 T4.4 — RLS verification script (blocked on H3/H4 for the real run)
+**Changed:** `supabase/tests/rls.sql` — paste-and-run check for the real project: two throwaway users inside a transaction that is
+rolled back; acting as each (role `authenticated` + their JWT claims) it checks B sees only their own documents, can't read A's even
+by id, can't change, delete or forge A's documents or scenarios, signed-out requests see nothing and can't call delete_my_account,
+and delete_my_account removes only the caller (and their documents) — 11 rows, each PASS/FAIL with a detail. `supabase/tests/
+supabase-stub.sql` (local-only imitation of Supabase's roles, auth.users and auth.uid()) + `scripts/rls-local.sh` / `npm run test:rls`.
+HUMAN_TODO H4 rewritten with exact steps and a fallback; SECURITY checklist updated.
+**Verified:** against a local PostgreSQL 16 with the stand-in: schema.sql applies twice (idempotent), **rls.sql 11/11 PASS** (RLS
+errors quoted: "new row violates row-level security policy…", "permission denied for table user_docs").
+**Needs Harvey's eyes:** run H4 once after creating the Supabase project (H3). Task marked `[~]` until then.
+
