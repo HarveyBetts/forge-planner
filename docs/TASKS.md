@@ -42,7 +42,7 @@ Harvey's own spreadsheet (budget + investments) defines this phase — see D23. 
 - [x] **T3.5** Investments: purchase lots → holdings (shares, total/avg cost £, avg buy price, currency incl. GBX, price, value £, gain £/%), totals; prices from the import or typed in. Accept: tests incl. GBX and USD lots.
 - [x] **T3.6** Import his .xlsx on-device (zip + XML read in the browser, no libraries; mapped by headings, not cell positions) → preview → confirm. Accept: tests on a synthetic workbook with the same layout; nothing saved before confirm; no personal data in git.
 - [x] **T3.7** Budget tab UI (week view with inline edits, cash forecast, bills, investments, net worth in base currency) + "Use these as my current balances" → updates the plan's pots after confirmation. Accept: e2e import → screens → use in plan.
-- [ ] **T3.1** Monthly check-in: enter actual pot values → snapshot → compare to glide path. Accept: on-track/behind updates.
+- [x] **T3.1** Monthly check-in: enter actual pot values → snapshot → compare to glide path. Accept: on-track/behind updates.
 - [ ] **T3.2b** (was T3.2) Planned vs actual per category and "freed-up money" linked to the engine's `freed` value.
 - [ ] **T3.3** CSV import (column mapping, dedupe, preview before commit). Accept: sample CSV fixtures for 2 bank formats; malformed rows reported, not crashed.
 - [ ] **T3.4** Reality check card: compares actual monthly saving rate with what the plan assumes. Accept: tests.

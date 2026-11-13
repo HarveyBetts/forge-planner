@@ -27,6 +27,7 @@ import { workbookToBudget } from './budget/importsheet.js';
 import { emptyBudget, STARTER_CATEGORIES, weekRow, setEntry, addWeeks, weekLabel, forecastBy, upcomingBills, mondayOf } from './budget/ledger.js';
 import { cashNow, netWorth, parseEntry, entryText, defaultWeek } from './budget/view.js';
 import { applyWhatIf, describeChanges, compareModel } from './ui/compare.js';
+import { checkinFields, valuesToQ49, makeSnapshot, trend, backupDue } from './ui/checkin.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -400,6 +401,7 @@ function planHTML() {
         <p class="sub">${esc(D.message)}</p>
         <p class="mini">${m(s.openingPot)} saved now · ${D.glide.needToday > 0 ? `${m(D.glide.needToday)} needed today to stay on plan` : 'your future saving covers the target'}</p>
       </section>
+      ${checkinCardHTML(D)}
       <section class="card free ${D.free.amount > 0 ? 'has' : ''}">
         <span class="lab">Free money this month</span>
         <span class="big"${animate && D.free.amount > 0 ? ` data-count="${Math.round(D.free.amount)}" data-cur="${cur}"` : ''}>${m(D.free.amount)}</span>
@@ -511,6 +513,56 @@ function chartTap(e) {
 }
 app.addEventListener('pointerdown', chartTap);
 app.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') chartTap(e); });
+
+// ---------------- monthly check-in (T3.1) ----------------
+const STATUS_WORD = { ahead: 'Ahead', 'on-track': 'On track', behind: 'Behind', short: 'Runs short' };
+function checkinCardHTML() {
+  const last = snapshots[snapshots.length - 1];
+  const done = last && last.at === currentMonth();
+  const hist = snapshots.slice(-6);
+  const tr = trend(snapshots, (x) => money(x, base(), { compact: true }));
+  return `<section class="card ci"><div class="ci-top"><span class="lab">Monthly check-in</span>
+      <span class="ci-l">${last ? `Last: ${monthLabel(last.at)} · ${STATUS_WORD[last.status] || ''}` : 'Not done yet'}</span></div>
+    ${hist.length > 1 ? `<ul class="ci-h">${hist.map((x) => `<li><span>${monthLabel(x.at).slice(0, 3)}</span><b>${money(x.total, base(), { compact: true })}</b><i class="st-${x.status}">${STATUS_WORD[x.status] || ''}</i></li>`).join('')}</ul>` : ''}
+    ${tr ? `<p class="mini">${esc(tr)}.</p>` : ''}
+    <button class="btn small ${done ? '' : 'primary'}" data-act="ci-open">${done ? 'Update this month' : `Check in for ${monthLabel(currentMonth())}`}</button>
+    ${backupDue(appSettings.lastBackupAt) ? `<p class="mini ci-bk">${appSettings.lastBackupAt ? 'It’s been a while since your last backup.' : 'You haven’t backed up yet.'} <button class="link-btn inline" data-act="export">Back up everything</button></p>` : ''}
+  </section>`;
+}
+function openCheckin() {
+  const q49 = (state.answers.q49 && state.answers.q49.v) || {};
+  const fields = checkinFields(base());
+  const sym = (c) => (c === 'AUD' ? 'A$' : c === 'GBP' ? '£' : c);
+  openSheet({ label: 'Monthly check-in', html: `<div class="sh-top"><h2 class="h2">Check in · ${monthLabel(currentMonth())}</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <p class="sub">What’s in each pot today? Rough numbers are fine; leave blank what you don’t have.</p>
+    ${budget ? '<button class="btn small" data-ci="budget">Fill cash, Premium Bonds and investments from my budget</button>' : ''}
+    <form class="sh-form" data-ci-form>${fields.map((f) => `<div class="field"><label for="ci-${f.k}">${esc(f.label)}</label>
+      <div class="money"><span class="money-sym">${sym(f.currency)}</span><input class="in" id="ci-${f.k}" name="${f.k}" inputmode="decimal" autocomplete="off" value="${q49[f.k] && Number.isFinite(q49[f.k].amount) ? q49[f.k].amount : ''}"></div></div>`).join('')}</form>
+    <div class="sh-actions single"><button class="btn primary" data-ci="save">Save check-in</button></div>`,
+  onClick: async (e) => {
+    const b = e.target.closest('[data-ci]');
+    if (!b) return;
+    e.preventDefault();
+    const form = sheetBody().querySelector('[data-ci-form]');
+    if (b.dataset.ci === 'budget') {
+      const fromBudget = balancesFromBudget();
+      for (const k of ['cashAUD', 'cashGBP', 'isa']) if (fromBudget[k] && form.elements[k]) form.elements[k].value = fromBudget[k].amount;
+      return;
+    }
+    const values = Object.fromEntries(fields.map((f) => [f.k, form.elements[f.k].value]));
+    const before = planSnap();
+    state = store.save({ ...state, answers: { ...state.answers, q49: { v: valuesToQ49(values, q49, base()) } } });
+    const sum = planSummary();
+    const { s } = buildScenario();
+    const snap = makeSnapshot(currentMonth(), state.answers.q49.v, sum, s ? scenarioCoastStatus(s).pot : 0);
+    await data.saveSnapshot(snap);
+    snapshots = await data.listSnapshots();
+    const lines = diffSnapshots(before, planSnap(), { currency: base() });
+    closeSheet();
+    render('none', { keepScroll: true });
+    toast(`Checked in — ${STATUS_WORD[snap.status]}${lines.length ? ' · ' + lines[0] : ''}`);
+  } });
+}
 
 // ---------------- timeline (v0: milestone list; T2.5 adds the scrubber) ----------------
 function needAnswersHTML(title) {
@@ -717,6 +769,7 @@ function sheetClick(e) {
 let budget = null;        // loaded at boot from the store (this device only)
 let budWeek = null;       // Monday of the week on screen
 let budSeg = 'money';     // 'money' | 'invest'
+let snapshots = [];       // monthly check-ins, oldest first (T3.1) — loaded at boot
 let budPreview = null;    // { budget, report, fileName } — an import waiting for "Save"; nothing stored until then
 const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const bm = (x, c, compact = false) => money(x, c || (budget && budget.currency) || base(), { compact });
@@ -1095,6 +1148,7 @@ function openNumberSetting(key) {
 // Full backup / restore / delete-all (T2.8). Restore replaces everything, so it asks first.
 async function exportEverything() {
   download(`forge-backup-${isoToday()}.json`, await data.exportAll());
+  appSettings = await data.saveSettings({ lastBackupAt: new Date().toISOString() });
   toast('Backup saved — keep the file somewhere safe');
 }
 function openRestore(text) {
@@ -1231,6 +1285,7 @@ app.addEventListener('click', (e) => {
   if (act === 'wi-edit') return openWhatIf(val);
   if (act === 'wi-compare') { screen = { name: 'scenarios', compare: val }; return render('fwd'); }
   if (act === 'wi-back') { screen = { name: 'scenarios' }; return render('back'); }
+  if (act === 'ci-open') return openCheckin();
   if (act === 'ev-add') return openEventEditor(null);
   if (act === 'ev-edit') return openEventEditor(val);
   if (act === 'tl-step') {
@@ -1313,6 +1368,7 @@ if (state.completedAt) {
 Promise.all([
   data.getSettings().then((st) => { appSettings = st || {}; userEvents = Array.isArray(st.events) ? st.events : []; }),
   data.getBudget().then((b) => { budget = b; }),
+  data.listSnapshots().then((l) => { snapshots = l; }),
 ]).catch(() => {}).finally(() => render('none'));
 // Live FX in the background; if the plan is on screen and rates changed, refresh it in place.
 {

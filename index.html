@@ -288,6 +288,14 @@ body.sheet-open{overflow:hidden}
 .cmp-v{font:600 16px Sora,Inter,sans-serif;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
 .cmp-v.win{color:var(--ok)}.cmp-v.win::after{content:" ✓";font-size:13px}
 .cmp-d{grid-column:1/-1;font-size:13px;color:var(--accent-ink);font-weight:600}
+.ci{display:flex;flex-direction:column;gap:8px}.ci-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.ci-l{font-size:14px;font-weight:600}.ci .btn{align-self:flex-start}
+.ci-h{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.ci-h li{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:12px;background:var(--soft);font-size:12px;min-width:0}
+.ci-h b{font:700 13px Sora,Inter,sans-serif;font-variant-numeric:tabular-nums}.ci-h i{font-style:normal;font-size:10.5px;font-weight:700;color:var(--muted);text-align:center}
+.ci-h .st-ahead{color:var(--ok)}.ci-h .st-on-track{color:var(--accent-ink)}.ci-h .st-behind,.ci-h .st-short{color:var(--warn-ink)}
+.link-btn.inline{display:inline;padding:0;min-height:0;font-size:inherit}
+.ci-bk{margin-top:2px}
 .foot{text-align:center;color:var(--muted);font-size:13px;margin:6px 0 0}
 .h3{font:700 18px/1.3 Sora,Inter,sans-serif;margin:0}
 /* shell: bottom tab bar (mounted on body; static blur only — never animated) */

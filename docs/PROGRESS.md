@@ -376,3 +376,17 @@ warns on the welcome screen and in Settings, works in memory across all tabs; a 
 answers" works. `tests/store.test.js` (+1: probe). Screenshots `artifacts/stranger-minimal-plan.png`, `stranger-safety-net.png`.
 `npm run check` → 211/211; e2e 33/33.
 **Needs Harvey's eyes:** nothing specific — this is the "a stranger opens it" safety work.
+
+## 2026-11-13 T3.1 — Monthly check-in
+**Changed:** `src/ui/checkin.js` (pure: the q49 pots with fixed currencies, typed values → q49 — blank removes, unreadable keeps —
+snapshot shape, "Up £2.1k since Oct 2026" trend, 30-day backup reminder). Plan screen: **Monthly check-in** card (last check-in and
+status, last six months as tiles with status colours, trend, "Check in for Nov 2026" / "Update this month", backup nudge with a
+one-tap **Back up everything** — SECURITY.md rule 9). The check-in sheet asks for each pot today (pre-filled), can **fill cash,
+Premium Bonds and investments from the budget**, then updates q49 (so the plan's status against the glide path moves), saves a
+snapshot `{ at, pots, total, status, need }` (one per month; updating replaces it) and toasts the new status + what moved. Backups
+record `lastBackupAt`.
+**Verified:** `tests/checkin.test.js` (3). `tests/e2e/checkin.spec.js` (2): with last month's check-in on the phone, check in with a
+bigger ISA → chip **Behind → Ahead**, card "Last: Nov 2026 · Ahead", two history tiles, "Up £381k since Oct 2026", snapshots stored
+as Oct behind / Nov ahead, q49 updated; backing up clears the nudge; "fill from my budget" puts investments £1,870, Premium Bonds
+£2,000 and A$3,839 into the form. Screenshot `artifacts/checkin-card.png`. `npm run check` → 214/214; e2e 35/35.
+**Needs Harvey's eyes:** do a real check-in at the start of each month.
