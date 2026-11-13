@@ -173,3 +173,17 @@ Mar 2029, last Feb 2039, nothing Mar 2039, annuity amount exact, deflation per y
 payments, rent stops; leave: 0 investing Mar–Aug 2030 then back to £2,000), every scenario schema-valid and projectable.
 `npm run check` → 142/142.
 **Needs Harvey's eyes:** whether "investing pauses during parental leave" matches what you'd actually do (it's conservative).
+
+## 2026-11-13 T2.2c — Answers drive settings
+**Changed:** `src/ui/settings.js` — `settingsFromAnswers` (theme q136, tone q134, budget style q43, budget period q44 with
+fallback to pay cycle q27, overspend flags q47, notifications q133 with "None" winning), `behindCopy` (three tones for
+Behind / Runs short — calm in all, never "you will"/"guaranteed"), `applyTheme` (`data-theme` on `<html>` + browser chrome
+colour). CSS dark tokens now apply for an explicit Dark choice or a dark phone unless Light is chosen. Settings has a
+**Preferences** section; each row reopens that question, and Save / × return to Settings (generic `returnTo`). Notifications
+are stored with an honest note that sending them comes with the installed app.
+**Verified:** `tests/settings.test.js` (8): defaults, each mapping, pay-cycle fallback, None wins, labels, three distinct
+tones with no banned words, applyTheme on a fake document. `tests/e2e/settings.spec.js` (4): Dark on a light phone (computed
+background is the dark token; survives reload), Light on a dark phone, Gently → Bluntly changes the plan message, pay-cycle
+fallback label and × returning to Settings. Screenshots `artifacts/settings-dark-override.png`, `artifacts/plan-tone-blunt.png`.
+`npm run check` → 150/150; e2e 10/10.
+**Needs Harvey's eyes:** the three tones' wording — pick the one that sounds like you want to be spoken to.

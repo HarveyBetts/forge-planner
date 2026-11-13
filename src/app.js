@@ -12,6 +12,7 @@ import { createFx, fxBadge } from './fx/fx.js';
 import { whatMustBeTrue } from './engine/solve.js';
 import { ROUTES, parseRoute, tabOf, slideDir, syncTabBar } from './ui/shell.js';
 import { milestones } from './ui/milestones.js';
+import { settingsFromAnswers, behindCopy, applyTheme, LABELS } from './ui/settings.js';
 import {
   projectScenario, projectFan, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -50,6 +51,7 @@ function render(dir = 'fwd', opts = {}) {
   quiet = !!opts.quiet;
   const screens = { welcome: welcomeHTML, question: questionHTML, review: reviewHTML, plan: planHTML,
     timeline: timelineHTML, budget: budgetHTML, scenarios: scenariosHTML, settings: settingsHTML };
+  applyTheme(settingsFromAnswers(state.answers).theme);
   const html = screens[screen.name]();
   app.innerHTML = `<main class="screen in-${dir}" id="main">${html}</main>`;
   const main = app.firstElementChild;
@@ -136,7 +138,7 @@ function questionHTML() {
   const p = progress(state.answers, state.mode);
   const sec = SECTION[def.section];
   const rec = state.answers[def.id];
-  const editing = screen.returnTo === 'review';
+  const editing = !!screen.returnTo;
   const autoAdvance = def.type === 'choice' || def.type === 'scale';
   return `<header class="qtop">
       <button class="icon-btn" data-act="exit" aria-label="Save and exit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -174,7 +176,7 @@ function saveCurrent() {
   return true;
 }
 function advance(fromId) {
-  if (screen.returnTo === 'review') return go({ name: 'review' }, 'back');
+  if (screen.returnTo) return go({ name: screen.returnTo }, 'back');
   const next = nextQuestion(state.answers, state.mode, fromId);
   if (next) return go({ name: 'question', id: next.id });
   // Reached the end of the list: jump to any skipped ones, else finish.
@@ -251,12 +253,13 @@ function planHTML() {
   if (!P.scenario) return reviewHTML();
   const { s, res, cs, fan, levers, status } = P;
   const cur = s.baseCurrency;
+  const tone = settingsFromAnswers(state.answers).tone;
   const m = (x, c) => money(x, cur, { compact: c });
   const chip = {
     coasting: ['ok', 'Coasting', 'Your pot would reach the target with no more investing.'],
     'on-track': ['info', 'On track', 'On current plans you reach your target by ' + s.retirementAge + '.'],
-    behind: ['warn', 'Behind', 'On current plans you fall short of your target.'],
-    short: ['warn', 'Runs short', `On these numbers your savings run out in ${monthLabel(res.depletedAt)}, when costs outgrow what you put away.`],
+    behind: ['warn', 'Behind', behindCopy(tone, 'behind')],
+    short: ['warn', 'Runs short', behindCopy(tone, 'short', { depletedLabel: monthLabel(res.depletedAt) })],
   }[status];
   const icon = status === 'behind' || status === 'short'
     ? '<path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/>'
@@ -417,6 +420,7 @@ function settingsHTML() {
     <section class="card list"><h2 class="list-h">Your plan</h2>
       <a class="row" href="#answers"><span class="row-l">Your answers</span><span class="row-v">${full.done} of ${full.total}</span><span class="row-c" aria-hidden="true">›</span></a>
     </section>
+    ${prefsHTML()}
     <section class="card list"><h2 class="list-h">Your data</h2>
       <button class="row" data-act="export"><span class="row-l">Export a backup</span><span class="row-c" aria-hidden="true">›</span></button>
       <label class="row as-label"><span class="row-l">Import a backup</span><span class="row-c" aria-hidden="true">›</span><input type="file" accept="application/json,.json" data-act="import" hidden></label>
@@ -427,6 +431,22 @@ function settingsHTML() {
       <p class="list-note">Forge is a planning tool. Estimates, not financial advice. All figures in today’s money.</p>
     </section>
   </div>`;
+}
+
+// Preferences come from your answers; each row reopens that question and Save returns here.
+function prefsHTML() {
+  const st = settingsFromAnswers(state.answers);
+  const row = (q, label, value) => `<button class="row" data-act="edit" data-val="${q}" data-return="settings"><span class="row-l">${label}</span><span class="row-v">${esc(value)}</span><span class="row-c" aria-hidden="true">›</span></button>`;
+  const n = st.notifications.map((x) => LABELS.notify[x]).join(', ') || 'None';
+  return `<section class="card list"><h2 class="list-h">Preferences</h2>
+    ${row('q136', 'Appearance', LABELS.theme[st.theme])}
+    ${row('q134', 'When you’re behind', LABELS.tone[st.tone])}
+    ${row('q43', 'Budget style', LABELS.style[st.budget.style])}
+    ${row('q44', 'Budget period', LABELS.period[st.budget.period] + (st.budget.periodFrom === 'q27' ? ' (your pay cycle)' : ''))}
+    ${row('q47', 'Overspending flags', LABELS.overspend[st.overspend])}
+    ${row('q133', 'Notifications', n)}
+    <p class="list-note">Notifications are saved for when Forge can send them (after it’s installed as an app).</p>
+  </section>`;
 }
 
 // ---------------- actions ----------------
@@ -468,8 +488,8 @@ app.addEventListener('click', (e) => {
     const q = nextQuestion(state.answers, 'full', null);
     return q ? go({ name: 'question', id: q.id }) : finish();
   }
-  if (act === 'edit') return go({ name: 'question', id: val, returnTo: 'review' });
-  if (act === 'exit') return go({ name: state.completedAt ? 'review' : 'welcome' }, 'back');
+  if (act === 'edit') return go({ name: 'question', id: val, returnTo: t.dataset.return || 'review' });
+  if (act === 'exit') return go({ name: screen.returnTo || (state.completedAt ? 'review' : 'welcome') }, 'back');
   if (act === 'pick') {
     const group = t.closest('[data-group]');
     if (group.dataset.multi === '1') {
@@ -497,7 +517,7 @@ app.addEventListener('click', (e) => {
   if (act === 'unknown') { state = store.save(setUnknown(state, screen.id)); return advance(screen.id); }
   if (act === 'skip') return advance(screen.id);
   if (act === 'back') {
-    if (screen.returnTo === 'review') return go({ name: 'review' }, 'back');
+    if (screen.returnTo) return go({ name: screen.returnTo }, 'back');
     const p = prevQuestion(state.answers, state.mode, screen.id);
     return p ? go({ name: 'question', id: p.id }, 'back') : go({ name: 'welcome' }, 'back');
   }
