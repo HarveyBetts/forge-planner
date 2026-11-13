@@ -18,6 +18,10 @@ import { parsePastedAnswers, entriesToAnswers } from './onboarding/paste.js';
 import { dashboardModel } from './ui/dashboard.js';
 import { chartModel, chartSVG, readoutAt } from './ui/chart.js';
 import { timelineModel, readoutText, nextStop } from './ui/timeline.js';
+import { createLocalStore } from './data/store.js';
+import { expandEvents } from './engine/events.js';
+import { FORMS, EDITABLE, formToEvent, eventToForm, eventLabel, eventWhen, newEventId } from './ui/eventforms.js';
+import { openSheet, closeSheet, setSheetHTML, sheetBody, toast } from './ui/sheet.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -199,12 +203,26 @@ function finish() {
   go({ name: missing.length ? 'review' : 'plan' });
 }
 
+// ---------------- the plan's scenario: your answers + the life events you added (T2.6) ----------------
+const data = createLocalStore();
+let userEvents = []; // loaded at boot from settings.events (kept in full backups)
+function buildScenario(events = userEvents) {
+  const out = answersToScenario(state.answers, { today: currentMonth(), convert: (a, from, to) => fx.convert(a, from, to) });
+  if (!out.scenario) return { out, s: null, problems: [] };
+  const { scenario, problems } = expandEvents({ ...out.scenario, events: [...(out.scenario.events || []), ...events] });
+  return { out, s: scenario, problems };
+}
+async function saveUserEvents(events) {
+  userEvents = events;
+  await data.saveSettings({ events });
+}
+
 // ---------------- what changed (after editing an answer) ----------------
 let pendingChange = null;
-function planSnap() {
+function planSnap(events) {
   try {
-    const out = answersToScenario(state.answers, { today: currentMonth(), convert: (a, from, to) => fx.convert(a, from, to) });
-    return out.scenario ? planSnapshot(out.scenario, projectScenario(out.scenario)) : null;
+    const { s } = buildScenario(events);
+    return s ? planSnapshot(s, projectScenario(s)) : null;
   } catch { return null; }
 }
 function noteChange(before, def) {
@@ -310,9 +328,8 @@ function planReady() {
 // ---------------- plan ----------------
 function computePlan() {
   const today = currentMonth();
-  const out = answersToScenario(state.answers, { today, convert: (a, from, to) => fx.convert(a, from, to) });
-  if (!out.scenario) return { ...out, today };
-  const s = out.scenario;
+  const { out, s } = buildScenario();
+  if (!s) return { ...out, today };
   const res = projectScenario(s);
   const cs = scenarioCoastStatus(s);
   const runAt = (nr) => projectScenario({ ...s, assumptions: { ...s.assumptions, nominalReturn: nr } });
@@ -321,7 +338,7 @@ function computePlan() {
   const levers = res.onTrack ? null : whatMustBeTrue(s);
   const D = dashboardModel(s, res, cs, { tone: settingsFromAnswers(state.answers).tone });
   const chartM = chartModel({ mid: res, low, high, glide: D.glide, target: res.target, coastDate: res.coastDate, currency: s.baseCurrency, birth: s.birth, actuals: [] });
-  return { ...out, today, s, res, cs, fan, levers, D, chartM, status: D.status };
+  return { ...out, scenario: s, today, s, res, cs, fan, levers, D, chartM, status: D.status };
 }
 
 const CHIP_ICON = {
@@ -339,8 +356,8 @@ function planHTML() {
   const m = (x, c) => money(x, cur, { compact: c });
   const animate = !quiet && !planAnimated;
   const events = [
-    ...s.oneOffs.map((o) => ({ at: o.at, name: o.name, amt: o.amount })),
-    ...s.items.filter((i) => i.kind === 'expense' && i.from).map((i) => ({ at: i.from, name: i.name, amt: -(i.annual ?? (i.monthly || 0) * 12), per: '/yr' })),
+    ...s.oneOffs.map((o) => ({ at: o.at, name: o.name, amt: o.amount, eventId: o.eventId })),
+    ...s.items.filter((i) => i.kind === 'expense' && i.from && !i.off).map((i) => ({ at: i.from, name: i.name, amt: -(i.annual ?? (i.monthly || 0) * 12), per: '/yr', eventId: i.eventId })),
   ].sort((a, b) => ym(a.at) - ym(b.at));
   const assumptions = [...P.assumptions, `Amounts in other currencies converted at mid-market rates (${fxBadge(fx)}).`];
   const ringLabel = D.ring.coasting ? `Coasting · +${m(D.ring.surplus, true)} surplus` : D.ring.label;
@@ -369,8 +386,9 @@ function planHTML() {
         ${res.lockedAtRetirement.map((l) => `<p class="callout warn">${esc(l.name)} (about ${m(l.value, true)} by then) stays locked until ${monthLabel(l.opens)}, ${l.yearsAfterRetirement % 1 ? l.yearsAfterRetirement.toFixed(1) : l.yearsAfterRetirement} years after you stop work. Your other savings need to cover that gap.</p>`).join('')}
       </section>
       ${levers ? leversHTML(levers, s, m) : ''}
-      ${events.length ? `<section class="card"><h2 class="rv-h">Life events in your plan</h2><ul class="ev">${events.map((e) =>
-        `<li><span class="ev-d">${monthLabel(e.at)}</span><span class="ev-n">${esc(e.name)}</span><span class="ev-a ${e.amt < 0 ? 'neg' : ''}">${money(e.amt, cur, { compact: true })}${e.per || ''}</span></li>`).join('')}</ul></section>` : ''}
+      <section class="card"><h2 class="rv-h">Life events in your plan</h2>${events.length ? `<ul class="ev">${events.map((e) =>
+        `<li${e.eventId ? ` class="ev-user" data-act="ev-edit" data-val="${esc(e.eventId)}" role="button" tabindex="0"` : ''}><span class="ev-d">${monthLabel(e.at)}</span><span class="ev-n">${esc(e.name)}</span><span class="ev-a ${e.amt < 0 ? 'neg' : ''}">${money(e.amt, cur, { compact: true })}${e.per || ''}</span></li>`).join('')}</ul>` : '<p class="mini">Nothing dated yet.</p>'}
+        <button class="link-btn" data-act="ev-add">+ Add a life event</button></section>
       ${P.notPlaced.length ? `<section class="card"><h2 class="rv-h">Not in the plan yet</h2><ul class="bul">${P.notPlaced.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></section>` : ''}
       <details class="card disc"><summary><span class="rv-h">Assumptions</span><span class="disc-n">${assumptions.length}</span><svg class="disc-c" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10l4 4 4-4"/></svg></summary>
         <div class="disc-b"><ul class="bul">${assumptions.map((t) => `<li>${esc(t)}${/estimate/i.test(t) ? ' <span class="tag">estimate</span>' : ''}</li>`).join('')}</ul>
@@ -492,6 +510,7 @@ function timelineHTML() {
         <div class="sc-jump"><button class="btn small" data-act="tl-step" data-val="-1" aria-label="Previous moment">‹ Previous</button><button class="btn small" data-act="tl-step" data-val="1" aria-label="Next moment">Next ›</button></div>
       </section>
       <p class="sub">Drag through the years, or tap a dot. Projected pot is the middle case in today’s money.</p>
+      ${userEventsHTML()}
       <ol class="tl">${list.map((m) => `<li class="tl-i k-${m.kind}${m.warn ? ' warn' : ''}${m.after ? ' after' : ''}" data-i="${ym(m.at) - startI}">
         <span class="tl-dot" aria-hidden="true"></span>
         <div class="tl-b"><span class="tl-d">${monthLabel(m.at)} · age ${Math.floor(m.age)}</span>
@@ -558,6 +577,111 @@ app.addEventListener('change', (e) => {
   const near = tlModel.stops.reduce((b, m) => (Math.abs(m.i - v) < Math.abs(b - v) ? m.i : b), Infinity);
   if (Math.abs(near - v) <= SNAP_MONTHS && near !== v) scrubAnimate(near);
 });
+
+// ---------------- life-event editor (T2.6) ----------------
+function userEventsHTML() {
+  const rows = userEvents.map((ev) => `<button class="ev-edit" data-act="ev-edit" data-val="${esc(ev.id)}"><span class="ev-d">${eventWhen(ev) ? monthLabel(eventWhen(ev)) : ''}</span><span class="ev-n">${esc(eventLabel(ev))}</span><span class="row-c" aria-hidden="true">›</span></button>`).join('');
+  return `<section class="card"><h2 class="rv-h">Events you’ve added</h2>${rows || '<p class="mini">Add kids, a home, holidays, cars, trips or a move — on top of what your answers already put in the plan.</p>'}
+    <button class="btn primary" data-act="ev-add" style="margin-top:10px">Add a life event</button></section>`;
+}
+let editing = null; // { template, id|null }
+function pickerHTML() {
+  return `<div class="sh-top"><h2 class="h2">Add a life event</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <div class="sh-pick">${EDITABLE.map((t) => `<button class="sh-card" data-ev="pick" data-val="${t}">${esc(FORMS[t].title)}<small>${esc(FORMS[t].blurb.split('.')[0])}.</small></button>`).join('')}
+    <button class="sh-card wide" data-ev="speedbird">Speedbird pathway<small>Comes from your answers (course start, investing in training and as a First Officer). Tap to edit those.</small></button></div>`;
+}
+function fieldHTML(f, value) {
+  const id = `evf-${f.k}`;
+  const v = value ?? '';
+  let input;
+  if (f.type === 'select') input = `<select class="in" id="${id}" name="${f.k}">${f.opts.map(([ov, ol]) => `<option value="${esc(ov)}"${String(v) === ov ? ' selected' : ''}>${esc(ol)}</option>`).join('')}</select>`;
+  else if (f.type === 'month') input = `<input class="in" id="${id}" name="${f.k}" type="month" value="${esc(v)}">`;
+  else if (f.type === 'money') input = `<div class="money"><span class="money-sym">${base() === 'AUD' ? 'A$' : '£'}</span><input class="in" id="${id}" name="${f.k}" inputmode="decimal" value="${esc(v)}" autocomplete="off"></div>`;
+  else if (f.type === 'number') input = `<input class="in" id="${id}" name="${f.k}" inputmode="decimal" value="${esc(v)}" autocomplete="off">`;
+  else input = `<input class="in" id="${id}" name="${f.k}" value="${esc(v)}" autocomplete="off">`;
+  return `<div class="field"><label for="${id}">${esc(f.label)}${f.optional ? ' <span class="sh-help">(optional)</span>' : ''}</label>${input}${f.help ? `<span class="sh-help">${esc(f.help)}</span>` : ''}</div>`;
+}
+function formHTML(template, values, isEdit) {
+  const F = FORMS[template];
+  return `<div class="sh-top"><h2 class="h2">${esc(F.title)}</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <p class="sub">${esc(F.blurb)}</p>
+    <form class="sh-form" data-ev-form novalidate>${F.fields.map((f) => fieldHTML(f, values[f.k])).join('')}</form>
+    <div class="sh-preview" aria-live="polite" data-ev-preview><span class="mini">Fill it in to see what it does to your plan.</span></div>
+    <div class="sh-actions${isEdit ? '' : ' single'}">${isEdit ? '<button class="btn danger" data-ev="delete">Delete</button>' : ''}<button class="btn primary" data-ev="save">${isEdit ? 'Save changes' : 'Add to my plan'}</button></div>`;
+}
+function readForm() {
+  const form = sheetBody() && sheetBody().querySelector('[data-ev-form]');
+  if (!form) return {};
+  const v = {};
+  for (const f of FORMS[editing.template].fields) {
+    const raw = form.elements[f.k] ? String(form.elements[f.k].value) : '';
+    // Amounts may be typed as "£4,000" or "4 000": keep digits, sign and decimal point only.
+    v[f.k] = f.type === 'money' || f.type === 'number' ? raw.replace(/[^\d.\-−]/g, '').replace('−', '-') : raw.trim();
+  }
+  return v;
+}
+function eventsWith(ev) {
+  return editing.id ? userEvents.map((e) => (e.id === editing.id ? ev : e)) : [...userEvents, ev];
+}
+function previewEvent(showErrors = false) {
+  const box = sheetBody() && sheetBody().querySelector('[data-ev-preview]');
+  if (!box) return null;
+  const { event, problems } = formToEvent(editing.template, readForm(), editing.id || 'preview');
+  if (problems.length) {
+    box.innerHTML = showErrors ? `<p class="sh-err" role="alert">${esc(problems[0])}</p>` : '<span class="mini">Fill it in to see what it does to your plan.</span>';
+    return null;
+  }
+  const lines = diffSnapshots(planSnap(), planSnap(eventsWith(event)), { currency: base() });
+  box.innerHTML = lines.length ? `<span class="lab">What this does to your plan</span><ul class="bul">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
+    : '<span class="mini">This doesn’t move your headline numbers.</span>';
+  return event;
+}
+function openEventEditor(id) {
+  if (id) {
+    const ev = userEvents.find((e) => e.id === id);
+    if (!ev) return;
+    editing = { template: ev.template, id };
+    openSheet({ html: formHTML(ev.template, eventToForm(ev), true), label: 'Edit life event', onClick: sheetClick, onInput: () => previewEvent(false) });
+    previewEvent(false);
+  } else {
+    editing = null;
+    openSheet({ html: pickerHTML(), label: 'Add a life event', onClick: sheetClick, onInput: () => { if (editing) previewEvent(false); } });
+  }
+}
+async function commitEvents(next, verb) {
+  const before = planSnap();
+  await saveUserEvents(next);
+  const lines = diffSnapshots(before, planSnap(), { currency: base() });
+  closeSheet();
+  const y = window.scrollY;
+  render('none', { quiet: true, keepScroll: true });
+  window.scrollTo(0, y);
+  toast(`${verb}${lines.length ? ' — ' + lines[0] : ''}`);
+}
+function sheetClick(e) {
+  const t = e.target.closest('[data-ev]');
+  if (!t) return;
+  e.preventDefault();
+  const act = t.dataset.ev;
+  if (act === 'pick') {
+    editing = { template: t.dataset.val, id: null };
+    setSheetHTML(formHTML(editing.template, {}, false));
+    const first = sheetBody().querySelector('input, select');
+    if (first && matchMedia('(hover: hover)').matches) first.focus({ preventScroll: true });
+    return;
+  }
+  if (act === 'speedbird') { closeSheet(); return go({ name: 'question', id: 'q12', returnTo: inShell(screen.name) ? screen.name : 'review' }); }
+  if (act === 'save') {
+    const ev = previewEvent(true);
+    if (!ev) return;
+    const id = editing.id || newEventId(userEvents);
+    return commitEvents(eventsWith({ ...ev, id }), editing.id ? 'Saved' : 'Added');
+  }
+  if (act === 'delete') {
+    if (!t.dataset.confirm) { t.dataset.confirm = '1'; t.textContent = 'Tap to confirm'; return; }
+    return commitEvents(userEvents.filter((x) => x.id !== editing.id), 'Deleted');
+  }
+}
 
 // ---------------- budget (Phase 3) ----------------
 function budgetHTML() {
@@ -697,6 +821,8 @@ app.addEventListener('click', (e) => {
     const p = prevQuestion(state.answers, state.mode, screen.id);
     return p ? go({ name: 'question', id: p.id }, 'back') : go({ name: 'welcome' }, 'back');
   }
+  if (act === 'ev-add') return openEventEditor(null);
+  if (act === 'ev-edit') return openEventEditor(val);
   if (act === 'tl-step') {
     const r = app.querySelector('.sc-range');
     const nx = tlModel && r ? nextStop(tlModel, tlTarget ?? Number(r.value), Number(val)) : null;
@@ -753,7 +879,9 @@ if (state.completedAt) {
 } else {
   screen = { name: 'welcome' };
 }
-render('none');
+// Load the life events you added (settings.events), then draw. LocalStore reads are synchronous under the
+// hood, so this resolves on the next microtask — no visible delay.
+data.getSettings().then((st) => { userEvents = Array.isArray(st.events) ? st.events : []; }).catch(() => {}).finally(() => render('none'));
 // Live FX in the background; if the plan is on screen and rates changed, refresh it in place.
 {
   const before = JSON.stringify(fx.rates());

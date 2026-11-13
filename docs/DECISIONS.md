@@ -93,3 +93,10 @@ even after coasting. *Reverse:* swap `glidePath` for the plan's mid-case project
 **D21 — Moved to its own repo, `HarveyBetts/forge-planner` (13 Nov 2026), and the old app is being retired.** Harvey created the
 repo; the `planner/` folder was split out with `git subtree split`, so this repo's history contains only planner commits and none
 of the old app's code or keys. Supersedes D14. The old `Forge` repo and its Supabase project are to be deleted by Harvey (HUMAN_TODO H8).
+
+**D22 — The event editor offers extra events, not the Speedbird pathway.** A plan built from answers treats the monthly
+investing amounts (q50: now / in training / as a First Officer) as the money going in at each stage; living costs aren't
+modelled separately. Adding a Speedbird *salary* event on top would count the same money twice. So the editor offers kids,
+home, holidays, cars, trips and moving country (all costs on top of the answers), and its Speedbird card opens the course-start
+question instead. User events live in `settings.events` (part of full backups; not a "scenario", so backup validation stays
+strict). *Reverse:* once income and living costs are modelled as separate streams, add `speedbirdPathway` to `FORMS`.

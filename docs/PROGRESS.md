@@ -258,3 +258,20 @@ clamping), readout text, jumps. `tests/e2e/timeline.spec.js` (2): ArrowRight / E
 destination), tap near a dot snaps onto it, drag to ~75%, list highlight; reduced motion jumps with no tween. Screenshot
 `artifacts/timeline-scrub.png`. `npm run check` → 179/179; e2e 23/23.
 **Needs Harvey's eyes:** drag feel and snapping on the phone.
+
+## 2026-11-13 T2.6 — Life-event editor
+**Changed:** `src/ui/sheet.js` (bottom sheet on `<body>`: CSS grip, drag-to-dismiss from the grip or when scrolled to the top,
+Escape / backdrop to close, slide in/out with the motion tokens; plus a small toast). `src/ui/eventforms.js` (form definitions for
+child, home, holidays, car, trip, move country; form ⇄ params; validation is the engine's own `eventProblems`). App: one
+`buildScenario()` = your answers + the events you added, used by the plan, chart, levers, timeline and "what changed". Timeline
+has "Events you’ve added" + **Add a life event**; the Plan's life-events card has "+ Add a life event" and your own events are
+tappable to edit. The sheet shows a **live preview** ("Coast date moved from Sep 2043 to Jun 2050…") as you type; Save/Add/Delete
+(two taps) update the screen in place with a toast. Speedbird card opens the course-start question (D22). Amounts accept "£60,000".
+**Verified:** `tests/eventforms.test.js` (6): every form maps to an engine template, Speedbird not offered, trip → exact cash
+flow, child bands/school/optionals, readable problems, event → form → event round-trip for every template, labels/ids.
+`tests/e2e/events.spec.js` (2): add (empty save shows the engine's message; preview appears; save closes the sheet; shows on the
+Timeline and the Plan; coast date changes; survives reload), edit from the Plan, delete with confirm (coast date returns), Escape
+closes, Speedbird card → q12 → × back to Timeline. Screenshots `artifacts/events-picker.png`, `artifacts/events-form.png`.
+`npm run check` → 185/185; e2e 25/25.
+**Needs Harvey's eyes:** sheet drag-to-dismiss feel on the iPhone; the preview wording.
+

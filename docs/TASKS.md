@@ -31,7 +31,7 @@ Phases 0–3 need nothing from Harvey except a GitHub repo to push to. Everythin
 - [x] **T2.3** Dashboard (a first version exists: the Plan screen in `src/app.js` → polish it into the full design): animated progress ring (pot vs coast number), status chip (ahead/on-track/behind), "free money this month" card, assumptions disclosure, real-terms label. Accept: screenshots for all three states.
 - [x] **T2.4** Projection chart (SVG, no libs): low/mid/high fan, glide path, actuals overlay, coast date marker. Accept: renders for edge cases (never coasts, already coasting).
 - [x] **T2.5** Life timeline: horizontal scrub through years with animated life-stage markers (training, FO start, kids, house…). Accept: scrubbing updates pot/age readout; works with keyboard.
-- [ ] **T2.6** Event editor sheet (Apple-style bottom sheet, drag-to-dismiss, ≥16px inputs) for the T1.3 templates. Accept: add/edit/delete event updates projection live.
+- [x] **T2.6** Event editor sheet (Apple-style bottom sheet, drag-to-dismiss, ≥16px inputs) for the T1.3 templates. Accept: add/edit/delete event updates projection live.
 - [ ] **T2.7** Scenario compare (A vs B side by side + delta). Accept: e2e "1 child vs 2 children".
 - [ ] **T2.8** Settings: currency (base/secondary), assumptions, export/import JSON backup, "delete all my data". Accept: export → clear → import restores everything.
 - [ ] **T2.9** Empty/zero-data, error and loading states everywhere ("stranger test"). Accept: app usable from a completely empty browser.
