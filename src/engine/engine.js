@@ -43,6 +43,7 @@ export function coastStatus({ pot, target, realReturn, yearsToRetirement }) {
 // A cash-flow item is { id, name, kind:'income'|'expense', monthly | annual | steps, from?, to? }
 //   steps: [{ from:'YYYY-MM', monthly }]  -> latest step whose `from` <= month applies (pay scales)
 function itemMonthly(item, i) {
+  if (item.off) return 0; // switched off by an event (e.g. replaced by a move)
   const from = item.from ? ym(item.from) : -Infinity;
   const to = item.to ? ym(item.to) : Infinity;
   if (i < from || i > to) return 0;

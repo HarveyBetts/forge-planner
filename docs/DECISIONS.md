@@ -73,3 +73,12 @@ with the target, but any pot still locked at retirement is reported (`lockedAtRe
 the accessible money has to bridge the gap. A full bridge calculation is a later refinement. (d) Coasting compares an
 "invested-equivalent" value (each pot grown at its own rate) with the coast number; with one pot it's identical to before.
 *Reverse:* set `cashRealReturn` equal to the share return to get the old behaviour.
+
+**D19 — Event templates' modelling conventions (T1.3).** Ages "X to Y" run from the Xth birthday month to the month
+before the Yth (so school 4→18 stops at 18). Mortgages start the month after completion and run exactly `years × 12`
+payments. Holidays are smoothed monthly (sinking-fund style) rather than lumped into specific months. Car replacements stop
+at retirement unless `until` is given. Relocation keeps every amount in the base currency (the engine is single-currency)
+and scales living-cost items by the % from the move month, including costs that start later. Events never invent money
+figures: Speedbird salary/training costs, child costs and school fees, deposit, mortgage, car and trip costs are all inputs;
+missing ones are reported, not guessed. Events that shorten existing items ("replaces" the karting job, relocation) record a
+reversible `patch` so `expandEvents` stays idempotent. *Reverse:* conventions live in `src/engine/events.js` only.

@@ -84,3 +84,16 @@ coast with mixed growth, UK 55→57 boundary months, ATO table boundaries, conve
 (single-pot results bit-identical). e2e walk now enters ISA + super and asserts the locked-super warning. `npm run check` → 83/83.
 **Needs Harvey's eyes:** the new "stays locked until Mar 2057" card wording; and note cash now counts as 0% real growth
 (see D18) — your plan numbers may look a little worse than before, and more honest.
+
+## 2026-11-13 T1.3 — Life-event library
+**Changed:** `src/engine/events.js` — templates `speedbirdPathway` (training → reduced scale for N years → main scale;
+salary steps by stage + years-in, one-off/monthly training costs, `replaces` the current job), `child` (age-band costs,
+optional school), `houseDeposit` (deposit, buying costs, mortgage), `holiday`, `car` (replacement cycle + running costs),
+`oneOffTrip`, `relocation` (moving cost + cost-of-living % on living costs). Pure `applyEvent`, idempotent `expandEvents`
+(skips and reports invalid events), `eventProblems` with readable messages, defaults per template. Engine: items can be
+switched `off`. Conventions logged in D19.
+**Verified:** `tests/events.test.js` (14) — exact net cash flow asserted month by month at every boundary for each template
+(e.g. Speedbird: Aug 2027 0 → Sep 2027 training → Mar 2029 reduced scale → Mar 2034 main scale; school stops the month of the
+18th birthday; mortgage = exactly 300 payments; cars Mar 2029/2037/2045 then stop at retirement), plus no-invented-salary,
+idempotency incl. full undo of patches, invalid-event reporting, engine projection. `npm run check` → 97/97.
+**Needs Harvey's eyes:** nothing yet (no UI until T2.6). Bring your Speedbird offer figures when we get to the event editor.
