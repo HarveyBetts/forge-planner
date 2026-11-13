@@ -449,3 +449,10 @@ serves the shell for navigations, works offline, ignores cross-origin and POST. 
 its worker in Chromium, then **opens with the network cut**, deep link included. `npm run check` → 227/227; e2e 41/41.
 **Needs Harvey's eyes:** delete the current home-screen icon, re-add from Safari (Share → Add to Home Screen) to get the new icon;
 then try opening it in flight mode.
+
+## 2026-11-13 T7.2 — README for Harvey
+**Changed:** `README.md` rewritten for Harvey: the link, putting it on the iPhone, first steps (questions / paste from the intake doc,
+import the spreadsheet, real balances, life events, monthly check-in), what each tab is for, where data lives and how to back up /
+restore / delete, what to do if something breaks; developer notes kept short at the bottom.
+**Verified:** links and steps match the shipped UI labels (checked against `src/app.js`). `npm run check` green.
+**Needs Harvey's eyes:** read it once — anything confusing is a UI-wording bug too.

@@ -67,4 +67,4 @@ Harvey's own spreadsheet (budget + investments) defines this phase — see D23. 
 
 ## Phase 7 — Deploy & ops
 - [x] **T7.1** Confirm CI + Pages workflows work (first green deploy). Likely `[~]` until Harvey enables Pages (H2).
-- [ ] **T7.2** README for Harvey (non-technical): how to open the app, back up data, what to do if something breaks.
+- [x] **T7.2** README for Harvey (non-technical): how to open the app, back up data, what to do if something breaks.

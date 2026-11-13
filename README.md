@@ -1,64 +1,60 @@
-# Forge — handover pack for Claude Code
+# Forge
 
-This folder is everything Claude Code needs to build **Forge**, Harvey's financial planner (Coast FIRE maths +
-life timeline + budgeting + AI), without being prompted every step. Start by reading `CLAUDE.md`.
+Your money planner: when you'll be able to stop working, what your life plans cost, and when the money you're investing becomes
+**free to spend** (Coast FIRE). Plus your weekly budget and investments, imported from your own spreadsheet.
 
-## What's inside
-| Path | Purpose |
+**Open it:** https://harveybetts.github.io/forge-planner/
+
+> Estimates, not financial advice. Everything is in today's money and shown as ranges.
+
+## Put it on your iPhone
+1. Open the link above in **Safari**.
+2. Tap **Share** → **Add to Home Screen** → **Add**.
+3. Open Forge from the new icon. It runs full-screen and works without signal.
+
+(If you added it before the new icon arrived, delete the old icon and add it again.)
+
+## First steps
+1. **Answer the questions.** *Quick start* (32 questions, ~10 min) gives you a plan; the rest can wait. Already typed answers in
+   the Forge intake doc? On the first screen tap **Paste answers from the intake doc**.
+2. **Bring in your budget.** Google Sheets → File → Download → Microsoft Excel (.xlsx). In Forge: **Budget → Import my
+   spreadsheet** → pick the file → check → **Save**.
+3. **Use your real balances.** Budget → **Use these as my current balances**.
+4. **Add life events** (kids, a home, trips, a move): **Timeline → Add a life event**.
+5. **Check in monthly** on the Plan screen — it records how you're doing and keeps the plan honest.
+
+## The tabs
+| Tab | What it's for |
 |---|---|
-| `CLAUDE.md` | The brain: what we're building, who Harvey is, hard rules, autonomy protocol |
-| `docs/TASKS.md` | The work queue Claude Code ticks off (Phases 0–7) |
-| `docs/SPEC.md` `ENGINE.md` `DESIGN.md` `SECURITY.md` | Product spec, maths, look & feel, security rules |
-| `docs/HUMAN_TODO.md` | The only things Harvey must do himself (numbered, copy-paste) |
-| `docs/PROGRESS.md` `DECISIONS.md` | Logs Claude Code writes as it works — read these when you come back |
-| `src/engine/engine.js` | Working, tested planning engine |
-| `src/onboarding/` + `src/app.js` + `index.html` | **Boot-up questions** (146, 32 quick-start) → your plan. See `docs/ONBOARDING.md` |
-| `docs/QUESTIONS.md` | Every question, generated from the code |
-| `tests/` | 39 unit tests + a Playwright walk of the onboarding (`tests/e2e/`) |
-| `supabase/` | Owner-only-RLS schema + AI edge-function sketch (untested) |
-| `scripts/run-autonomous.sh` | Headless loop: keeps launching Claude Code until the task list is done |
-| `.claude/` | Permissions allowlist, `/next` command, the unattended prompt |
-| `.github/workflows/` | CI (tests on every push) + auto-deploy to GitHub Pages |
-| `data/seed.local.json` | Harvey's starting facts. **Personal — gitignored, never commit.** |
+| **Plan** | Are you on track? Coast date, free money this month, target pot, the chart (tap it), what would get you there, reality check against your budget |
+| **Timeline** | Drag through your life: training, First Officer, kids, house — your pot at each point |
+| **Budget** | Your weekly ledger, cash by fortnight, bills, weekly plans, investments, net worth, bank CSV import |
+| **Scenarios** | What-ifs ("two children", "stop at 57") side by side with your plan |
+| **Settings** | Appearance, how blunt Forge is, assumptions (inflation etc.), **backups** |
 
-## Run it — interactive (simplest)
+## Your data
+- Everything lives **on your phone only**. Nothing is uploaded, and your bank details are never asked for.
+- **Back up** regularly: Settings → **Back up everything** (one file — save it to iCloud Drive). Forge reminds you monthly.
+- New phone or something went wrong? Settings → **Restore from a backup**.
+- Settings → **Delete all my data** wipes it from the phone.
+
+## If something breaks
+- If a screen shows **"Something went wrong"**: tap **Back up everything** first, then **Reload**.
+- Numbers look off? Settings shows the assumptions; Plan → Assumptions lists every one in use.
+- Tell Claude what you tapped and what you expected — a screenshot helps. The app is checked on a simulated iPhone, but your
+  phone is the real test.
+
+---
+
+## For developers (and Claude Code)
+Read `CLAUDE.md` first; the work queue is `docs/TASKS.md`, logs in `docs/PROGRESS.md` / `docs/DECISIONS.md`, Harvey's steps in
+`docs/HUMAN_TODO.md`. Plain ES modules, no build step, no dependencies at runtime.
+
 ```bash
-unzip forge-handover.zip -d forge-planner && cd forge-planner
-npm run check            # should say 39 pass
-npm run serve            # open http://localhost:8080 — the questions start on first launch
-claude                   # then type:  /next
+npm run check      # syntax + unit tests (must be green before every commit)
+npm run test:e2e   # Playwright suite at iPhone size (screenshots → artifacts/)
+npm run serve      # http://localhost:8080
+npm run build:site # stage the public site into _site/ (what GitHub Pages publishes)
 ```
-`/next` does one task from `docs/TASKS.md`, tests it, commits, and logs it. Repeat, or use the loop below.
-
-## Run it — unattended
-```bash
-claude --help            # confirm these flags exist on your version: -p, --permission-mode, --max-turns, --max-budget-usd
-tmux new -s forge        # so it survives closing the terminal
-bash scripts/run-autonomous.sh
-```
-The loop reads `docs/TASKS.md`, runs Claude Code headless on the next open task, waits, and repeats until nothing
-is open. It sleeps 15 min and retries if Claude exits with an error (e.g. a usage limit), and quits after 3 rounds
-with no new commit. Tune with `MAX_ITERS`, `MAX_TURNS`, `BUDGET_USD`, `SLEEP_SECS`, `RETRY_SECS`.
-
-### What "24/7" honestly means
-- **Claude Code works in sessions, not as a daemon.** The loop re-launches it back-to-back, so it keeps going while
-  you sleep — as long as the machine stays on, your plan's usage limits allow it, and tasks aren't blocked.
-  It will stop (by design) when it needs you; the reasons are in `docs/HUMAN_TODO.md`.
-- **The app itself does run 24/7** once deployed: static files on GitHub Pages + Supabase. No server of yours to keep alive.
-- **It can't see your phone.** Visual work is logged as "should work" with Playwright screenshots in `artifacts/`;
-  you confirm on your iPhone.
-- **The loop script is untested against a live `claude` install** (written without access to one). The first run
-  is the test — watch `logs/run-<date>.log`.
-
-### Safety of unattended mode
-Permissions come from `.claude/settings.json` (an allowlist: npm/node/git/file tools; denies force-push, `sudo`,
-`rm -rf /`, `.env` reads). Don't add `--dangerously-skip-permissions` unless you run inside a disposable VM/container.
-Budget and turn caps stop runaway spend. Pushes go to `main` only after `npm run check` is green, and the Pages
-workflow re-runs the checks before deploying.
-
-## First message if you'd rather paste a prompt
-> Read CLAUDE.md, then work through docs/TASKS.md following the Autonomy protocol. Don't ask me questions — log blockers in docs/HUMAN_TODO.md and carry on. Start with T0.1.
-
-## Before you push to GitHub
-`git status` must NOT list `data/seed.local.json`. GitHub Pages on a free account needs a public repo; that's OK
-here because no personal data is committed and the database enforces per-user access (see `docs/HUMAN_TODO.md` H2).
+Push to `main` → CI (unit + e2e) → GitHub Pages deploys. Personal data (`data/seed.local.json`, spreadsheets) is gitignored and the
+site build refuses to publish it.
