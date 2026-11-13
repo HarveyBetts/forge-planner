@@ -50,3 +50,15 @@ never values) so onboarding asks for them. `build-site.sh` takes an optional out
 `importAnswers`, and a real `build-site.sh` run into a temp dir contains no data/docs/tests/scripts/local JSON.
 `npm run seed` against the real seed: 2 answers (base currency, course start Sep 2027); ISA, super, birth, retirement age skipped.
 **Needs Harvey's eyes:** your seed file marks the ISA and super balances `confirmed:false` — confirm them in onboarding (q49).
+
+## 2026-11-13 T1.1 — Live FX engine
+**Changed:** `src/fx/fx.js` — `createFx({fetch, now, storage})` with `ensure/rates/convert/isLive/ageMs/source`, `pickRates`
+validation, `fxBadge` ("rates updated 3h ago" / "approx. offline rates"); `FX_FALLBACK` gains EUR (from legacy). App now
+converts with live rates (fallback until fetched), refreshes the plan **in place without replaying the ring** if rates change
+after boot, and the assumptions list says which rates were used. CSP allows open.er-api.com; e2e serves a fixed rate table.
+**Verified:** `tests/fx.test.js` (11): round-trips equal to 1e-9 for 4 pairs × 4 amounts, legacy maths, unknown currency throws,
+payload validation, fallback before any fetch / offline first launch (not persisted), 6 h cache + refresh + force, cache survives
+reload, stale-but-real kept when offline, HTTP error/bad JSON/corrupt cache/hostile storage, concurrent calls share one request.
+Found and fixed a bug while testing: a cache timestamp of 0 read as "never fetched". Plan screen screenshot `artifacts/onb-5-plan.png`.
+**Needs Harvey's eyes:** nothing new visually (one extra line in Assumptions).
+

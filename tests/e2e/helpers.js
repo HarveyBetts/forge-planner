@@ -10,6 +10,9 @@ export async function prepare(page) {
   page.on('pageerror', (e) => errors.push(String(e)));
   // Google Fonts are optional (system fallbacks exist); don't let the network decide pass/fail.
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  // Live FX: serve a fixed table so numbers are deterministic (the real API is free and keyless).
+  await page.route(/open\.er-api\.com/, (r) => r.fulfill({ status: 200, contentType: 'application/json',
+    body: JSON.stringify({ result: 'success', rates: { USD: 1, GBP: 0.8, AUD: 1.5, EUR: 0.9 } }) }));
   return errors;
 }
 

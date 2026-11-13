@@ -8,12 +8,14 @@ import {
 import { createStore, setAnswer, setUnknown, exportAnswers, importAnswers } from './onboarding/state.js';
 import { renderInput, readInput } from './onboarding/inputs.js';
 import { esc, money, monthLabel, currentMonth, summarize } from './ui/format.js';
-import { convertApprox } from './fx/fallback.js';
+import { createFx, fxBadge } from './fx/fx.js';
 import {
   projectScenario, projectFan, solveMonthlyContribution, coastStatus, ym,
 } from './engine/engine.js';
 
 const app = document.getElementById('app');
+const fx = createFx();
+let quiet = false; // true for in-place data refreshes: no entrance or ring animation (DESIGN rule 6)
 const store = createStore();
 let state = store.load();
 let screen = { name: 'welcome' };
@@ -29,14 +31,15 @@ function go(next, dir = 'fwd') {
   screen = next;
   render(dir);
 }
-function render(dir = 'fwd') {
+function render(dir = 'fwd', opts = {}) {
+  quiet = !!opts.quiet;
   const html = ({ welcome: welcomeHTML, question: questionHTML, review: reviewHTML, plan: planHTML })[screen.name]();
   app.innerHTML = `<main class="screen in-${dir}" id="main">${html}</main>`;
   const main = app.firstElementChild;
   main.scrollTop = 0;
   window.scrollTo(0, 0);
   if (screen.name === 'question') focusFirst(main);
-  if (screen.name === 'plan') animatePlan(main);
+  if (screen.name === 'plan' && !quiet) animatePlan(main);
 }
 function focusFirst(root) {
   const el = root.querySelector('input.in:not([type=hidden]), textarea.in, select.in');
@@ -197,7 +200,7 @@ function planReady() {
 // ---------------- plan ----------------
 function computePlan() {
   const today = currentMonth();
-  const out = answersToScenario(state.answers, { today, convert: convertApprox });
+  const out = answersToScenario(state.answers, { today, convert: (a, from, to) => fx.convert(a, from, to) });
   if (!out.scenario) return { ...out, today };
   const s = out.scenario;
   const res = projectScenario(s);
@@ -236,7 +239,7 @@ function planHTML() {
   return `<header class="bar"><h1 class="h2">Your plan</h1><button class="btn small" data-act="review">Edit answers</button></header>
     <div class="wrap">
       <section class="card hero">
-        ${ring(Math.min(1, cs.progress), `${Math.min(999, Math.round(cs.progress * 100))}%`, 'of your coast number', true)}
+        ${ring(Math.min(1, cs.progress), `${Math.min(999, Math.round(cs.progress * 100))}%`, 'of your coast number', !quiet)}
         <p class="chip ${chip[0]}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg>${chip[1]}</p>
         <p class="sub">${chip[2]}</p>
         <p class="mini">${m(s.openingPot)} invested now · ${m(cs.coastNumber)} needed to coast</p>
@@ -255,7 +258,7 @@ function planHTML() {
       ${events.length ? `<section class="card"><h2 class="rv-h">Life events in your plan</h2><ul class="ev">${events.map((e) =>
         `<li><span class="ev-d">${monthLabel(e.at)}</span><span class="ev-n">${esc(e.name)}</span><span class="ev-a ${e.amt < 0 ? 'neg' : ''}">${money(e.amt, cur, { compact: true })}${e.per || ''}</span></li>`).join('')}</ul></section>` : ''}
       ${P.notPlaced.length ? `<section class="card"><h2 class="rv-h">Not in the plan yet</h2><ul class="bul">${P.notPlaced.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></section>` : ''}
-      <section class="card"><h2 class="rv-h">Assumptions</h2><ul class="bul">${P.assumptions.map((t) => `<li>${esc(t)}</li>`).join('')}<li>Amounts in other currencies converted at approximate offline rates.</li></ul></section>
+      <section class="card"><h2 class="rv-h">Assumptions</h2><ul class="bul">${P.assumptions.map((t) => `<li>${esc(t)}</li>`).join('')}<li>Amounts in other currencies converted at mid-market rates (${esc(fxBadge(fx))}).</li></ul></section>
       <p class="foot">Estimates, not financial advice. All figures in today’s money.</p>
     </div>`;
 }
@@ -412,3 +415,14 @@ app.addEventListener('keydown', (e) => {
 // ---------------- boot ----------------
 screen = state.completedAt ? (planReady() ? { name: 'plan' } : { name: 'review' }) : { name: 'welcome' };
 render('none');
+// Live FX in the background; if the plan is on screen and rates changed, refresh it in place.
+{
+  const before = JSON.stringify(fx.rates());
+  fx.ensure().then(() => {
+    if (screen.name === 'plan' && JSON.stringify(fx.rates()) !== before) {
+      const y = window.scrollY;
+      render('none', { quiet: true });
+      window.scrollTo(0, y);
+    }
+  });
+}

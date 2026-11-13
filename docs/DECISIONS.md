@@ -44,3 +44,12 @@ handover could only reach that repo and could not create `forge-planner` (H1). B
 branch keeps the legacy app at the repo root untouched (its Pages site is unaffected) and nothing is lost. Note:
 GitHub only runs workflows from the repo-root `.github/`, so `planner/.github/workflows/*` are dormant until the split.
 *Reverse:* H1 below — split `planner/` into its own repo with full history (`git subtree split`).
+
+**D15 — FX differs from legacy on purpose in three places:** unknown currencies throw (legacy silently used 1:1, which
+hides bugs); fetched rates are validated before use; the cache key is versioned (`forge.fx.v1`). Same source
+(open.er-api.com, free, keyless, mid-market), same 6 h TTL, same USD-based maths, same offline table (+EUR from legacy).
+CSP `connect-src` now allows `https://open.er-api.com`. *Reverse:* swap `FX_URL`; the module is injectable.
+
+**D16 — T2.2a pulled forward to straight after T1.1.** The FX change touched `src/app.js`, and the old walk script couldn't
+launch a browser in this environment, so the plan screen had no end-to-end cover. Moving the walk into the Playwright suite
+first means every later app change is checked by a real browser walk.
