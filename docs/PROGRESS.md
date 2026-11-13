@@ -285,3 +285,12 @@ symmetric penny rounding. Task list re-ordered so Harvey's spreadsheet comes fir
 made-up 30-week budget with pay 2 weeks late; no-lag variant; week rows incl. refunds; immutability; range totals; bills.
 `npm run check` → 195/195.
 **Needs Harvey's eyes:** nothing yet (UI is T3.7).
+
+## 2026-11-13 T3.5 — Investments model
+**Changed:** `src/budget/investments.js` (pure): `parseQty` (handles the invisible characters copy-pasted share quantities
+carry), `parsePrice` ($ → USD, £ → GBP, € → EUR, "125p"/GBX → pence), `holdings(lots, prices, toGBP)` — rolls purchase lots up per
+ticker like the sheet's right-hand table: shares, total cost £, average cost £, average buy price, currency, price, value £,
+gain £ and % — with totals that leave unpriced holdings out of the gain and list them.
+**Verified:** in `tests/budget.test.js`: parsing (incl. word-joiner characters), GBP/USD/GBX lots, mixed-case tickers merged,
+unpriced holding handled. (Committed with T3.2.)
+**Needs Harvey's eyes:** nothing yet.
