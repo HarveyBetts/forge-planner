@@ -10,7 +10,7 @@ import { renderInput, readInput } from './onboarding/inputs.js';
 import { esc, money, monthLabel, currentMonth, summarize } from './ui/format.js';
 import { createFx, fxBadge } from './fx/fx.js';
 import {
-  projectScenario, projectFan, solveMonthlyContribution, coastStatus, ym,
+  projectScenario, projectFan, solveMonthlyContribution, scenarioCoastStatus, ym,
 } from './engine/engine.js';
 
 const app = document.getElementById('app');
@@ -204,8 +204,7 @@ function computePlan() {
   if (!out.scenario) return { ...out, today };
   const s = out.scenario;
   const res = projectScenario(s);
-  const years = (ym(s.birth) + Math.round(s.retirementAge * 12) - ym(today)) / 12;
-  const cs = coastStatus({ pot: s.openingPot, target: res.target, realReturn: res.realReturn, yearsToRetirement: years });
+  const cs = scenarioCoastStatus(s);
   const fan = projectFan(s, [0.04, 0.07, 0.09]);
   const extra = res.onTrack ? 0 : solveMonthlyContribution(s);
   const inv = (s.items.find((i) => i.id === 'investing') || {}).steps || [];
@@ -242,7 +241,7 @@ function planHTML() {
         ${ring(Math.min(1, cs.progress), `${Math.min(999, Math.round(cs.progress * 100))}%`, 'of your coast number', !quiet)}
         <p class="chip ${chip[0]}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg>${chip[1]}</p>
         <p class="sub">${chip[2]}</p>
-        <p class="mini">${m(s.openingPot)} invested now · ${m(cs.coastNumber)} needed to coast</p>
+        <p class="mini">${m(s.openingPot)} saved now · ${m(cs.coastNumber)} needed to coast</p>
       </section>
       <div class="grid2">
         <section class="card kpi"><span class="lab">Target pot at ${s.retirementAge}</span><span class="big">${m(res.target, true)}</span><span class="mini">pays ${m(s.assumptions.retirementSpend)}/yr at ${(s.assumptions.withdrawalRate * 100).toFixed(1).replace('.0', '')}%</span></section>
@@ -254,6 +253,7 @@ function planHTML() {
         ${chart(res, cur)}
         ${extra ? `<p class="callout warn">Investing about <strong>${m(extra)}</strong> more a month from now would close the gap.</p>` : ''}
         ${extra === null ? '<p class="callout warn">The target isn’t reachable by investing more alone. Try a later age or a lower spend.</p>' : ''}
+        ${res.lockedAtRetirement.map((l) => `<p class="callout warn">${esc(l.name)} (about ${m(l.value, true)} by then) stays locked until ${monthLabel(l.opens)}, ${l.yearsAfterRetirement % 1 ? l.yearsAfterRetirement.toFixed(1) : l.yearsAfterRetirement} years after you stop work. Your other savings need to cover that gap.</p>`).join('')}
       </section>
       ${events.length ? `<section class="card"><h2 class="rv-h">Life events in your plan</h2><ul class="ev">${events.map((e) =>
         `<li><span class="ev-d">${monthLabel(e.at)}</span><span class="ev-n">${esc(e.name)}</span><span class="ev-a ${e.amt < 0 ? 'neg' : ''}">${money(e.amt, cur, { compact: true })}${e.per || ''}</span></li>`).join('')}</ul></section>` : ''}

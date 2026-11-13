@@ -2,6 +2,7 @@
 // starter scenario for the engine. No DOM, no storage, no network.
 import { QUESTIONS, BY_ID, v, optValue } from './questions.js';
 import { ym, fromYm } from '../engine/engine.js';
+import { defaultAccessAge } from '../engine/pots.js';
 import { monthLabel } from '../ui/format.js';
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -136,10 +137,25 @@ export function answersToScenario(answers, opts = {}) {
   if (withdrawalRate == null) { withdrawalRate = 0.04; assumptions.push('Withdrawal rate: 4% a year.'); }
   assumptions.push(`Inflation: ${DEFAULT_INFLATION * 100}% a year. All figures are in today’s money.`);
 
-  // Opening pot (everything counted as invested for now; T1.2 splits locked pensions/super).
-  const pots = v(answers, 'q49') || {};
-  const openingPot = ['cashGBP', 'cashAUD', 'isa', 'super', 'other'].reduce((s, k) => s + money(pots[k]), 0);
-  if (pots.super && isNum(pots.super.amount)) assumptions.push('Australian super counted in the pot (access age not modelled yet).');
+  // Opening pots (q49), each in the base currency with its own growth and access rules (T1.2).
+  const bal = v(answers, 'q49') || {};
+  const POT_DEFS = [
+    ['cashGBP', 'Cash (£)', 'cash'], ['cashAUD', 'Cash (A$)', 'cash'], ['isa', 'Stocks ISA', 'invested'],
+    ['super', 'Australian super', 'super'], ['other', 'Other savings', 'invested'],
+  ];
+  const pots = [];
+  for (const [k, name, kind] of POT_DEFS) {
+    const m = bal[k];
+    if (!m || !isNum(m.amount)) continue;
+    pots.push({ id: k, name, kind, balance: money(m), originalCurrency: m.currency || base, accessAge: defaultAccessAge(kind, birth) });
+  }
+  // Positive cash flow is invested in the ISA if there is one, else in "Other savings"/a new invested pot.
+  const openingPot = pots.reduce((sum, p) => sum + p.balance, 0);
+  if (pots.some((p) => p.kind === 'cash')) assumptions.push('Cash savings keep pace with inflation but don’t grow beyond it (0% real). Shares grow at the investment return.');
+  const sup = pots.find((p) => p.kind === 'super');
+  if (sup) {
+    assumptions.push(`Australian super can’t be touched until ${sup.accessAge} (ATO preservation age for your birth date), and only once you meet a condition of release such as retiring. Estimate — check with your fund.`);
+  }
 
   // Career timing.
   const speedbird = v(answers, 'q11') !== 'Not doing it';
@@ -264,6 +280,7 @@ export function answersToScenario(answers, opts = {}) {
     birth,
     retirementAge,
     openingPot,
+    pots,
     investShare: 1,
     redirectAfterCoast: v(answers, 'q57') === 'Spend more now once on track',
     assumptions: { nominalReturn, inflation: DEFAULT_INFLATION, withdrawalRate, retirementSpend, otherRetirementIncome },

@@ -69,3 +69,18 @@ finishing, resume-to-Plan after reload, Review screen, zero console errors. `wal
 CI `e2e` job (T0.2) runs it and uploads `artifacts/` (dormant until the repo split — D14).
 **Verified:** `npm run test:e2e` → 2 passed; screenshots `artifacts/onb-1…6`.
 **Needs Harvey's eyes:** nothing new.
+
+## 2026-11-13 T1.2 — Multi-pot model with access ages
+**Changed:** `src/engine/pots.js` (pot shape, researched default access ages with sources — D17, `accessMonth`, `potsToBase`
+FX conversion, `potProblems` validation); `src/engine/dates.js` (shared date helpers, avoids a circular import);
+`projectScenario` now runs per-pot balances (own growth rate, per-pot contributions, flow pot, drawdown order, lock respected)
+and reports `accessible`/`locked`/`byPot` per row plus `accessibleAtRetirement` and `lockedAtRetirement`;
+`scenarioCoastStatus` (coast check with per-pot growth). Onboarding q49 now produces separate pots (cash £, cash A$, ISA,
+super with its ATO access age, other). Plan screen: ring uses per-pot growth; "saved now"; warning card when a pot is still
+locked after you stop work (e.g. super until 60 when retiring at 55).
+**Verified:** `tests/pots.test.js` (15) incl. **a locked £100k super that cannot fund drawdown before 60** (accessible goes
+negative, `depletedAt` set, super untouched), unlock → drawn, drawdown order, flow pot, employer contributions, cash 0% real,
+coast with mixed growth, UK 55→57 boundary months, ATO table boundaries, conversion, validation. All 68 earlier tests unchanged
+(single-pot results bit-identical). e2e walk now enters ISA + super and asserts the locked-super warning. `npm run check` → 83/83.
+**Needs Harvey's eyes:** the new "stays locked until Mar 2057" card wording; and note cash now counts as 0% real growth
+(see D18) — your plan numbers may look a little worse than before, and more honest.

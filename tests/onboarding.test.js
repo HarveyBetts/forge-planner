@@ -189,6 +189,10 @@ test('amounts are converted to the base currency', () => {
   }), { today, convert: convertApprox });
   near(r.scenario.openingPot, 14000 + 15200 / 1.52 * 0.79, 1e-6);
   assert.ok(r.assumptions.some((s) => /super/i.test(s)));
+  const sup = r.scenario.pots.find((p) => p.id === 'super');
+  assert.deepEqual([sup.kind, sup.accessAge, sup.originalCurrency], ['super', 60, 'AUD']);
+  near(sup.balance, 15200 / 1.52 * 0.79, 1e-6);
+  assert.equal(r.scenario.pots.find((p) => p.id === 'isa').accessAge, null);
 });
 
 test('events before today or after retirement are dropped and noted', () => {

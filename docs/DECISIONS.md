@@ -53,3 +53,23 @@ CSP `connect-src` now allows `https://open.er-api.com`. *Reverse:* swap `FX_URL`
 **D16 — T2.2a pulled forward to straight after T1.1.** The FX change touched `src/app.js`, and the old walk script couldn't
 launch a browser in this environment, so the plan screen had no end-to-end cover. Moving the walk into the Playwright suite
 first means every later app change is checked by a real browser walk.
+
+**D17 — Pension/super access ages come from official sources (checked 13 Nov 2026), and stay editable per pot.**
+- UK private/workplace pensions: normal minimum pension age 55, rising to **57 from 6 April 2028** — gov.uk policy paper
+  "Increasing normal minimum pension age": https://www.gov.uk/government/publications/increasing-normal-minimum-pension-age .
+  Modelled as: 55 if you turn 55 before April 2028, else 57. Schemes with a *protected pension age* differ → editable.
+- Australian super: **preservation age 60 for anyone born on or after 1 July 1964** (55–59 for earlier births, ATO table),
+  and you also need a *condition of release* (e.g. retiring) — ATO "Conditions of release":
+  https://www.ato.gov.au/individuals/super/withdrawing-and-using-your-super/super-withdrawal-options/ .
+- ISA / general investing / cash: no lock. (A Lifetime ISA would be 60 — not modelled; set `accessAge` if needed.)
+Not modelled (yet): tax on withdrawals, super transfer to the UK (QROPS), the proposal to keep the UK NMPA 10 years below
+state pension age (not legislated). *Reverse:* edit `src/engine/pots.js` `defaultAccessAge`.
+
+**D18 — Multi-pot modelling choices.** (a) Cash grows at `assumptions.cashRealReturn`, default **0% real** (keeps pace with
+inflation, no more) — shown as an assumption; before T1.2 cash silently compounded at the share return, which flattered the
+plan. (b) Drawdown order: cash → invested → unlocked pensions/super; a locked pot is never drawn early — the shortfall
+shows as negative *accessible* money and sets `depletedAt`. (c) "On track" still compares the *total* pot (incl. locked)
+with the target, but any pot still locked at retirement is reported (`lockedAtRetirement`) and shown as a warning, because
+the accessible money has to bridge the gap. A full bridge calculation is a later refinement. (d) Coasting compares an
+"invested-equivalent" value (each pot grown at its own rate) with the coast number; with one pot it's identical to before.
+*Reverse:* set `cashRealReturn` equal to the share return to get the old behaviour.

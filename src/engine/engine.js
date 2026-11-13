@@ -4,20 +4,9 @@
 // See docs/ENGINE.md for the maths and docs/SPEC.md for the scenario schema.
 
 // ---------- date helpers ('YYYY-MM' or 'YYYY-MM-DD' -> month index) ----------
-export function ym(dateStr) {
-  const parts = String(dateStr).split('-');
-  const y = Number(parts[0]);
-  const m = Number(parts[1]);
-  if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) {
-    throw new RangeError('Bad date: ' + dateStr);
-  }
-  return y * 12 + (m - 1);
-}
-export function fromYm(i) {
-  const y = Math.floor(i / 12);
-  const m = (i % 12) + 1;
-  return y + '-' + String(m).padStart(2, '0');
-}
+import { ym, fromYm } from './dates.js';
+import { accessMonth } from './pots.js';
+export { ym, fromYm };
 
 // ---------- core formulas ----------
 export function realRate(nominal, inflation) {
@@ -83,12 +72,26 @@ export function monthlyNet(s, i) {
   return net;
 }
 
-// s = { start, birth, retirementAge, openingPot, assumptions:{nominalReturn, inflation, withdrawalRate,
-//       retirementSpend, otherRetirementIncome?}, items?, oneOffs?, investShare?, redirectAfterCoast? }
+// s = { start, birth, retirementAge, openingPot?, pots?, flowPot?, assumptions:{nominalReturn, inflation,
+//       withdrawalRate, retirementSpend, otherRetirementIncome?, cashRealReturn?}, items?, oneOffs?,
+//       investShare?, redirectAfterCoast? }
+// Pots (src/engine/pots.js) must already be in the base currency. Without `pots`, `openingPot` is one
+// invested, always-accessible pot — exactly the original single-pot model.
+//
+// Each month: every pot grows at its own real rate; per-pot contributions land in their pot; positive net
+// flow goes to `flowPot` (default: first accessible invested pot); negative net flow is drawn from pots that
+// are accessible THAT MONTH — cash first, then invested, then unlocked pensions/super. A locked pot is never
+// drawn early: if the accessible pots run dry the shortfall shows up as a negative accessible balance and
+// `depletedAt` is set, even if a locked pension is large.
+function normalizePots(s) {
+  if (Array.isArray(s.pots) && s.pots.length) return s.pots;
+  return [{ id: 'main', name: 'Invested', kind: 'invested', balance: s.openingPot || 0 }];
+}
+const DRAW_ORDER = { cash: 0, invested: 1, pension: 2, super: 3 };
+
 export function projectScenario(s) {
   const a = s.assumptions;
   const r = realRate(a.nominalReturn, a.inflation);
-  const rm = Math.pow(1 + r, 1 / 12) - 1;
   const startI = ym(s.start);
   const birthI = ym(s.birth);
   const endI = birthI + Math.round(s.retirementAge * 12);
@@ -99,17 +102,41 @@ export function projectScenario(s) {
   });
   const share = s.investShare == null ? 1 : s.investShare;
 
+  const defs = normalizePots(s).map((p) => {
+    const pr = Number.isFinite(p.realReturn) ? p.realReturn
+      : p.kind === 'cash' ? (Number.isFinite(a.cashRealReturn) ? a.cashRealReturn : 0) : r;
+    return { ...p, r: pr, rm: Math.pow(1 + pr, 1 / 12) - 1, from: accessMonth(p, s.birth) };
+  });
+  const bal = defs.map((p) => Number(p.balance) || 0);
+  const sameRate = defs.every((p) => p.r === r);
+  const accessibleAt = (k, i) => i >= defs[k].from;
+  let flowK = defs.findIndex((p) => p.id === s.flowPot);
+  if (flowK < 0) flowK = defs.findIndex((p) => p.kind === 'invested' && p.from === -Infinity);
+  if (flowK < 0) flowK = defs.findIndex((p) => p.from === -Infinity);
+  if (flowK < 0) { // nothing accessible: invest into a new, empty accessible pot
+    defs.push({ id: '__flow', name: 'Invested', kind: 'invested', r, rm: Math.pow(1 + r, 1 / 12) - 1, from: -Infinity });
+    bal.push(0);
+    flowK = defs.length - 1;
+  }
+  const drawOrder = defs.map((_, k) => k).sort((x, y) => (DRAW_ORDER[defs[x].kind] ?? 9) - (DRAW_ORDER[defs[y].kind] ?? 9) || x - y);
+
   const rows = [];
-  let pot = s.openingPot || 0;
   let coastDate = null;
-  let depletedAt = null; // first month the pot goes below zero (costs outgrew savings)
+  let depletedAt = null; // first month the money you can actually touch goes below zero
   let freedTotal = 0;
 
   for (let i = startI; i <= endI; i++) {
     const yearsLeft = (endI - i) / 12;
     const cn = coastNumber({ target, realReturn: r, yearsToRetirement: yearsLeft });
-    const grown = pot * (1 + rm);
-    const coasting = grown >= cn;
+    for (let k = 0; k < defs.length; k++) {
+      bal[k] *= 1 + defs[k].rm;
+      if (defs[k].contrib) bal[k] += itemMonthly(defs[k].contrib, i);
+    }
+    // "Invested-equivalent" pot: what today's balances are worth in coast terms. With one shared rate
+    // this is just the total (keeps single-pot results bit-for-bit identical).
+    const equiv = () => (sameRate ? bal.reduce((x, y) => x + y, 0)
+      : bal.reduce((sum, b, k) => sum + b * Math.pow((1 + defs[k].r) / (1 + r), yearsLeft), 0));
+    const coasting = equiv() >= cn;
     const flow = monthlyNet(s, i);
     let contribution;
     let freed = 0;
@@ -121,26 +148,50 @@ export function projectScenario(s) {
         freed += invested;
         contribution = 0;
       }
+      bal[flowK] += contribution;
     } else {
       contribution = flow; // drawdown
+      let need = -flow;
+      for (const k of drawOrder) {
+        if (need <= 0) break;
+        if (!accessibleAt(k, i) || bal[k] <= 0) continue;
+        const take = Math.min(bal[k], need);
+        bal[k] -= take;
+        need -= take;
+      }
+      if (need > 0) bal[flowK] -= need; // shortfall: accessible money goes negative (borrowing)
     }
     freedTotal += freed;
-    pot = grown + contribution;
-    if (coastDate === null && pot >= cn) coastDate = fromYm(i);
-    if (depletedAt === null && pot < 0) depletedAt = fromYm(i);
+    let pot = 0, accessible = 0, locked = 0;
+    const byPot = {};
+    for (let k = 0; k < defs.length; k++) {
+      pot += bal[k];
+      if (accessibleAt(k, i)) accessible += bal[k]; else locked += bal[k];
+      byPot[defs[k].id] = bal[k];
+    }
+    const eq = equiv();
+    if (coastDate === null && eq >= cn) coastDate = fromYm(i);
+    if (depletedAt === null && accessible < 0) depletedAt = fromYm(i);
     rows.push({
       ym: fromYm(i),
       age: (i - birthI) / 12,
       pot,
+      accessible,
+      locked,
+      byPot,
       flow,
       contribution,
       freed,
       coastNumber: cn,
-      isCoasting: pot >= cn,
+      isCoasting: eq >= cn,
     });
   }
 
   const last = rows[rows.length - 1];
+  // Pots still locked when you stop work: the accessible money has to bridge the gap until they open.
+  const lockedAtRetirement = defs
+    .filter((p) => p.from > endI && Math.abs(last.byPot[p.id]) > 0)
+    .map((p) => ({ id: p.id, name: p.name, value: last.byPot[p.id], opens: fromYm(p.from), yearsAfterRetirement: (p.from - endI) / 12 }));
   return {
     rows,
     realReturn: r,
@@ -149,9 +200,28 @@ export function projectScenario(s) {
     depletedAt,
     freedTotal,
     retirementPot: last.pot,
+    accessibleAtRetirement: last.accessible,
+    lockedAtRetirement,
     onTrack: last.pot >= target,
     gap: last.pot - target,
   };
+}
+
+// Coast status for a whole scenario *today*: like coastStatus(), but each pot grows at its own rate
+// (cash doesn't compound like shares). `pot` is the "invested-equivalent" value of all pots.
+export function scenarioCoastStatus(s) {
+  const a = s.assumptions;
+  const r = realRate(a.nominalReturn, a.inflation);
+  const years = (ym(s.birth) + Math.round(s.retirementAge * 12) - ym(s.start)) / 12;
+  const target = targetPot({ annualSpend: a.retirementSpend, otherAnnualIncome: a.otherRetirementIncome || 0, withdrawalRate: a.withdrawalRate });
+  const pots = normalizePots(s);
+  const pot = pots.reduce((sum, p) => {
+    const pr = Number.isFinite(p.realReturn) ? p.realReturn
+      : p.kind === 'cash' ? (Number.isFinite(a.cashRealReturn) ? a.cashRealReturn : 0) : r;
+    const b = Number(p.balance) || 0;
+    return sum + (pr === r ? b : b * Math.pow((1 + pr) / (1 + r), Math.max(0, years)));
+  }, 0);
+  return { ...coastStatus({ pot, target, realReturn: r, yearsToRetirement: years }), pot, target };
 }
 
 // Retirement pot under several nominal-return assumptions (e.g. [0.04, 0.07, 0.09]).
