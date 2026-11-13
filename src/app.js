@@ -548,6 +548,8 @@ function scrubAnimate(target) {
   tlAnim = requestAnimationFrame(step);
 }
 app.addEventListener('input', (e) => { if (e.target.matches && e.target.matches('.sc-range')) { cancelAnimationFrame(tlAnim); tlTarget = null; scrubTo(Number(e.target.value)); } });
+// Touching the slider stops any running spring, so the thumb never moves under your finger.
+app.addEventListener('pointerdown', (e) => { if (e.target.matches && e.target.matches('.sc-range')) { cancelAnimationFrame(tlAnim); tlTarget = null; } });
 // Let go within 4 months of a moment → snap onto it (markers are visual; the slider takes every touch).
 const SNAP_MONTHS = 4;
 app.addEventListener('change', (e) => {

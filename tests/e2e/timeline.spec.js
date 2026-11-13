@@ -31,6 +31,7 @@ test('timeline scrubber: keyboard, markers and next/previous update the readout'
   await expect(page.locator('.tl-i.cur .tl-l')).toHaveText('Speedbird training starts');
   await page.getByRole('button', { name: 'Previous moment' }).click();
   await expect(read.locator('.sc-stage')).toHaveText('Today');
+  await expect(range).toHaveValue('0'); // spring settled
 
   // Tap near a marker on the track → the thumb goes there and snaps onto the moment.
   const mk = page.locator('.sc-mk[data-label="Dirt-bike trip"]');

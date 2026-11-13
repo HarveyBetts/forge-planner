@@ -201,10 +201,11 @@ figcaption{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--m
 .sc-track{position:relative;height:44px;margin:0 6px}
 .sc-rail{position:absolute;left:0;right:0;top:20px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
 .sc-fill{height:100%;width:0;background:var(--accent);border-radius:2px}
-.sc-mk{position:absolute;top:15px;width:14px;height:14px;margin-left:-7px;border-radius:50%;border:2px solid var(--muted);background:var(--surface);padding:0;z-index:0;pointer-events:none;
-  transition:transform .35s var(--e-spring),background .2s,border-color .2s;touch-action:manipulation}
+.sc-mk{position:absolute;top:17px;width:10px;height:10px;margin-left:-5px;border-radius:50%;border:2px solid var(--muted);background:var(--surface);padding:0;z-index:0;pointer-events:none;
+  transition:background .2s var(--e-out),border-color .2s var(--e-out),transform .35s var(--e-spring)}
 .sc-mk.k-stage{border-color:var(--accent)}.sc-mk.k-money{border-color:var(--ok)}.sc-mk.warn{border-color:var(--warn)}.sc-mk.k-end{border-color:var(--ink)}
-.sc-mk.on{background:currentColor;transform:scale(1.18)}.sc-mk.k-stage.on{background:var(--accent)}.sc-mk.k-money.on{background:var(--ok)}.sc-mk.k-event.on,.sc-mk.k-today.on{background:var(--muted)}.sc-mk.warn.on{background:var(--warn)}.sc-mk.k-end.on{background:var(--ink)}
+.sc-mk.on{background:var(--muted);border-color:var(--surface);transform:scale(.9)}
+.sc-mk.k-stage.on{background:var(--accent)}.sc-mk.k-money.on{background:var(--ok)}.sc-mk.warn.on{background:var(--warn)}.sc-mk.k-end.on{background:var(--ink)}
 .sc-range{position:absolute;inset:0;width:100%;height:44px;margin:0;background:transparent;-webkit-appearance:none;appearance:none;z-index:1;touch-action:pan-y}
 .sc-range::-webkit-slider-runnable-track{height:44px;background:transparent}
 .sc-range::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:8px;border-radius:50%;background:var(--surface);border:0;box-shadow:0 2px 10px rgba(15,23,42,.28),0 0 0 3px var(--accent)}

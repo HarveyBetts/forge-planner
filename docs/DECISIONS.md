@@ -89,3 +89,7 @@ coast-number curve: it's the backward recursion of the engine step from the targ
 "enough to finish the plan as written", and big future costs correctly raise the bar. On-track band ±5% (inclusive),
 editable. Simplifications: one real return for all money (no per-pot rates or locks) and contributions assumed invested
 even after coasting. *Reverse:* swap `glidePath` for the plan's mid-case projection (`projectScenario(...).rows`).
+
+**D21 — Moved to its own repo, `HarveyBetts/forge-planner` (13 Nov 2026), and the old app is being retired.** Harvey created the
+repo; the `planner/` folder was split out with `git subtree split`, so this repo's history contains only planner commits and none
+of the old app's code or keys. Supersedes D14. The old `Forge` repo and its Supabase project are to be deleted by Harvey (HUMAN_TODO H8).

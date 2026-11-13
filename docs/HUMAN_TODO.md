@@ -2,21 +2,12 @@
 
 Claude Code appends here when blocked. Phases 0–3 need only **H1**. Do these in order when you reach them.
 
-## H1 — Give the planner its own GitHub repo (needed to deploy; ~5 min)
-Right now the planner lives in the `planner/` folder of your existing `Forge` repo, on the branch
-`claude/optimistic-turing-r99wzv` (see DECISIONS D14). Your live legacy app is untouched.
-1. github.com → New repository → name `forge-planner`. Don't add a README. Public or private: see H2.
-2. Easiest: start a Claude Code session with **both** repos attached and say:
-   "Split the planner/ folder of Forge into forge-planner with its history and push it to main."
-3. Or by hand, in a clone of `Forge`:
-   `git checkout claude/optimistic-turing-r99wzv && git subtree split --prefix=planner -b planner-only && git push https://github.com/HarveyBetts/forge-planner.git planner-only:main`
-4. `data/seed.local.json` is gitignored and was never committed — the new repo won't contain it.
+## H1 — Own GitHub repo ✅ done (13 Nov 2026)
+`HarveyBetts/forge-planner`, public. The planner was moved in with its own history (DECISIONS D21).
 
-## H2 — Choose how to host (decide before first deploy)
-GitHub Pages on a **free** account only serves **public** repos (as far as I know — confirm on GitHub's docs).
-That is fine here *because* no personal data is in git and the database enforces per-user access.
-- Option A (default): make the repo public → Settings → Pages → Source: **GitHub Actions**.
-- Option B: keep the repo private and host on Cloudflare Pages / Netlify (free), pointed at the `_site/` output of `npm run build:site`.
+## H2 — Turn on hosting (1 min)
+GitHub → `forge-planner` → Settings → Pages → Source: **GitHub Actions**. Every push to `main` then runs the checks and
+publishes the site at https://harveybetts.github.io/forge-planner/ . On your iPhone: open it in Safari → Share → Add to Home Screen.
 
 ## H3 — Create a NEW Supabase project (Phase 4)
 Do **not** reuse the legacy Forge project. supabase.com → New project → copy the Project URL and the
@@ -39,6 +30,15 @@ come from you or the official offer paperwork — Claude Code is forbidden from 
 
 ## H7 — Test on your iPhone
 After each phase, open the app on your phone (add to Home Screen) and send a numbered punch list.
+
+---
+## H8 — Retire the old Forge app (10 min, do it once the new one is live)
+The old app's database can be read and written by anyone who has the key published in the old public repo. Shut it down:
+1. Anything you want to keep: Supabase → old project → Table Editor → pick a table → Export to CSV.
+2. Supabase → old project → Settings → General → **Delete project**.
+3. GitHub → `Forge` → Settings → Danger Zone → **Delete this repository** (takes the old site and its history offline).
+4. If you ever saved real passwords in the old app's Passwords or Vault tabs, change those passwords.
+5. Delete the old Forge icon from your home screen.
 
 ---
 ## Blocked items logged by Claude Code (newest last)

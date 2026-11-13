@@ -8,7 +8,7 @@
 ## 1. What we are building
 
 **Forge** is Harvey's personal financial planner and life-timeline app. Same name as his earlier
-life-organiser (legacy repo: `github.com/HarveyBetts/Forge`, public, kept as a reference only) — but this is
+life-organiser (legacy repo `HarveyBetts/Forge` — being deleted, see HUMAN_TODO H8; everything needed from it is already ported) — but this is
 a **new codebase with a new purpose**: plan a financial future around real life milestones.
 
 The idea came from a Coast FIRE Instagram post (a couple with ~$715k at 34 who can stop investing and

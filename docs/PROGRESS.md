@@ -245,12 +245,16 @@ at the start), shortfall at the baseline + words, actuals dots + readout, too-sh
 no overflow. Screenshots `artifacts/chart-{typical,never-coasts,coasting}.png`. `npm run check` → 176/176; e2e 21/21.
 **Needs Harvey's eyes:** chart legibility at phone size, and the tap/drag feel.
 
-## 2026-11-13 T2.5 — IN PROGRESS (not ticked)
-**Changed so far:** `src/ui/timeline.js` (pure scrubber model, readout text, stop-to-stop jumps) + Timeline tab scrubber: native range
-input (keyboard/VoiceOver), visual milestone markers under the slider aligned to the thumb's travel, snap to a moment when released
-within 4 months, spring-eased Next/Previous (instant under reduced motion), list highlight follows. Fixed while testing: rapid taps
-during the spring stepped from the overshoot; markers a year apart had overlapping tap targets; a drag starting on a marker grabbed
-the marker instead of the slider.
-**Verified:** `tests/timeline.test.js` (3) pass; `npm run check` 179/179. e2e: reduced-motion test passes; the main scrubber test
-passes keyboard, Next/Previous steps but its tap-near-marker → snap assertion still fails when run after the earlier steps — next
-thing to fix before ticking T2.5.
+## 2026-11-13 T2.5 — Timeline scrubber
+**Changed:** `src/ui/timeline.js` (pure model: stops, readout at any month, readout text, stop-to-stop jumps). Timeline tab:
+readout card (date · age, life stage, projected pot or "short by", what happens that month), a native range slider (so keyboard,
+VoiceOver, Home/End all work) with small milestone dots under it aligned to the thumb's travel, snap onto a moment when you let go
+within 4 months of it, spring-eased Previous / Next (instant under reduced motion), the list below highlights where you are.
+Fixed while testing: rapid taps during the spring stepped from the overshoot; dots a year apart had overlapping tap targets; a drag
+starting on a dot grabbed the dot (dots are now visual only); touching the slider mid-spring let the thumb keep moving under your
+finger (touch now stops the spring); dots and thumb drifted apart by up to 14px at the ends.
+**Verified:** `tests/timeline.test.js` (3): stops at the right months, readout follows position (age, pot, stage, cash flow,
+clamping), readout text, jumps. `tests/e2e/timeline.spec.js` (2): ArrowRight / End / Home, Next / Previous (from the
+destination), tap near a dot snaps onto it, drag to ~75%, list highlight; reduced motion jumps with no tween. Screenshot
+`artifacts/timeline-scrub.png`. `npm run check` → 179/179; e2e 23/23.
+**Needs Harvey's eyes:** drag feel and snapping on the phone.
