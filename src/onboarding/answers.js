@@ -184,6 +184,52 @@ export function answersToScenario(answers, opts = {}) {
   } else {
     notPlaced.push('Monthly investing (question 50).');
   }
+  // Planned investing in a given month (latest step that has started).
+  const investingAt = (at) => steps.filter((st) => ym(st.from) <= ym(at)).sort((a, b) => ym(a.from) - ym(b.from)).pop()?.monthly || 0;
+
+  // Training costs you pay yourself (q14) — a one-off when the course starts.
+  if (courseStart) {
+    const tc = v(answers, 'q14') || {};
+    if (tc.youPay && isNum(tc.youPay.amount)) {
+      if (tc.youPay.amount > 0) oneOffs.push({ at: courseStart, amount: -money(tc.youPay), name: 'Training (your share)' });
+    } else if (tc.total && isNum(tc.total.amount)) {
+      notPlaced.push('Training cost: how much you pay yourself (question 14).');
+    }
+    // Training loan (q15): fixed monthly repayments (standard annuity maths). They're fixed in pounds/dollars,
+    // so in today's money they shrink with inflation — modelled as yearly steps.
+    const loan = v(answers, 'q15') || {};
+    const hasLoan = loan.amount && isNum(loan.amount.amount) && loan.amount.amount > 0;
+    if (hasLoan && isNum(loan.rate) && loan.start && isNum(loan.years) && loan.years > 0) {
+      const P = money(loan.amount);
+      const n = Math.round(loan.years * 12);
+      const i = loan.rate / 100 / 12;
+      const pay = i > 0 ? (P * i) / (1 - Math.pow(1 + i, -n)) : P / n;
+      const loanSteps = [];
+      for (let y = 0; y < Math.ceil(n / 12); y++) {
+        const from = addYears(loan.start, y);
+        const yearsFromToday = (ym(from) - ym(today)) / 12;
+        loanSteps.push({ from, monthly: pay / Math.pow(1 + DEFAULT_INFLATION, Math.max(0, yearsFromToday)) });
+      }
+      items.push({ id: 'training-loan', name: 'Training loan repayments', kind: 'expense', steps: loanSteps,
+        from: loan.start, to: addMonths(loan.start, n - 1), nominalMonthly: pay });
+      assumptions.push(`Training loan: ${n} fixed repayments from ${monthLabel(loan.start)}. Fixed payments shrink in today’s money as prices rise.`);
+    } else if (hasLoan) {
+      notPlaced.push('Training loan repayments: needs the rate, start month and term (question 15).');
+    }
+  }
+
+  // Captain upgrade (q21): a milestone only — Forge has no captain pay figure and won't invent one.
+  const cap = v(answers, 'q21') || {};
+  if (cap.model === 'Yes' && isNum(cap.age)) {
+    marks.push({ at: addYears(birth, cap.age), label: 'Captain upgrade' });
+    notPlaced.push('Captain pay: no figure yet, so the upgrade is on the timeline but doesn’t change the numbers.');
+  }
+  // Coming back to the UK (q3): a milestone; costs need figures.
+  const uk = v(answers, 'q3') || {};
+  if (uk.when) {
+    marks.push({ at: uk.when, label: `Move back to the UK${uk.where ? ` (${uk.where})` : ''}` });
+    notPlaced.push('UK move: moving costs and the change in living costs (no figures yet).');
+  }
 
   // Kids and private school.
   const kids = v(answers, 'q74') || {};
@@ -198,10 +244,18 @@ export function answersToScenario(answers, opts = {}) {
       const fee = money(v(answers, 'q82'));
       const extras = money(v(answers, 'q85'));
       const childcare = money(v(answers, 'q86'));
+      const leave = v(answers, 'q76');
       for (let k = 0; k < count; k++) {
         const childBirth = addYears(birth, kids.ageFirst + k * gap);
         if (ym(childBirth) > ym(endYm)) continue;
         const label = `Child ${k + 1}`;
+        // Parental leave (q76): investing pauses for that many months from each birth (conservative — the
+        // drop in income isn't known). Implemented as an expense equal to the planned investing then.
+        if (isNum(leave) && leave > 0 && ym(childBirth) >= ym(today)) {
+          const paused = investingAt(childBirth);
+          if (paused > 0) items.push({ id: `leave-${k + 1}`, name: `${label}: parental leave (investing paused)`, kind: 'expense',
+            monthly: paused, from: childBirth, to: addMonths(childBirth, leave - 1) });
+        }
         if (childcare) {
           items.push({ id: `childcare-${k + 1}`, name: `${label} childcare`, kind: 'expense', monthly: childcare,
             from: childBirth, to: addMonths(addYears(childBirth, fromAge && fromAge < 4 ? fromAge : 4), -1) });
@@ -215,7 +269,13 @@ export function answersToScenario(answers, opts = {}) {
           }
         }
       }
-      if (school && school !== 'No' && fee) assumptions.push('School fees rise with inflation only, until 18.');
+      if (school && school !== 'No' && fee) {
+        if (v(answers, 'q92') === 'Yes, assume faster') notPlaced.push('Faster school-fee rises (question 92): no rate given, so fees rise with inflation only for now.');
+        assumptions.push('School fees rise with inflation only, until 18.');
+      }
+      if (isNum(leave) && leave > 0) assumptions.push(`Parental leave: no investing for ${leave} month${leave === 1 ? '' : 's'} after each birth (the actual drop in pay isn’t known).`);
+      const uni = v(answers, 'q87');
+      if (uni === 'Fully' || uni === 'Partly') notPlaced.push(`University (${uni.toLowerCase()} paid, question 87): no amount yet.`);
     }
   }
 
@@ -225,7 +285,22 @@ export function answersToScenario(answers, opts = {}) {
     const dep = v(answers, 'q98') || {};
     if (price && isNum(dep.percent) && dep.by) {
       oneOffs.push({ at: dep.by, amount: -price * dep.percent / 100, name: 'House deposit' });
-      assumptions.push('House: deposit only; mortgage payments and buying costs not modelled yet.');
+      // Mortgage (q99): first payment the month after buying, years × 12 payments, level in today's money.
+      const mort = v(answers, 'q99') || {};
+      if (isNum(mort.years) && mort.years > 0 && mort.monthly && isNum(mort.monthly.amount)) {
+        const n = Math.round(mort.years * 12);
+        items.push({ id: 'mortgage', name: 'Mortgage', kind: 'expense', monthly: money(mort.monthly), from: addMonths(dep.by, 1), to: addMonths(dep.by, n) });
+        assumptions.push('Mortgage payment stays level in today’s money.');
+        // Rent you pay now (q36) stops when you buy; that money counts as freed up from then on.
+        const rent = money(v(answers, 'q36'));
+        if (rent) {
+          items.push({ id: 'rent-saved', name: 'Rent you no longer pay', kind: 'income', monthly: rent, from: addMonths(dep.by, 1) });
+          assumptions.push('When you buy, the rent you pay now stops.');
+        }
+      } else {
+        notPlaced.push('Mortgage payments (question 99).');
+      }
+      if (v(answers, 'q100') === 'Yes') notPlaced.push('Buying costs (stamp duty, legal, moving): no figure yet (question 100).');
     } else if (price || has(dep.by)) {
       notPlaced.push('House deposit (questions 97 and 98).');
     }
@@ -241,6 +316,12 @@ export function answersToScenario(answers, opts = {}) {
       oneOffs.push({ at, amount: -carBudget, name: 'Car' });
       at = isNum(every) ? addYears(at, every) : null;
     } while (at && ym(at) <= ym(endYm));
+  }
+  // Car running costs (q111): from the first planned car, or from now if there's no purchase planned.
+  const running = money(v(answers, 'q111'));
+  if (running) {
+    const firstCar = carBudget && foStart && ym(foStart) >= ym(today) ? foStart : today;
+    items.push({ id: 'car-running', name: 'Car running costs', kind: 'expense', monthly: running, from: firstCar });
   }
 
   // Dirt-bike trip.

@@ -51,7 +51,7 @@ Required: **q1** birth, **q4** retirement age, **q63** retirement income. Withou
 | Answer | Becomes |
 |---|---|
 | q7 | base currency; every money answer converted into it |
-| q49 | opening pot (cash £/A$, ISA, super, other) |
+| q49 | separate pots: cash £ and A$ (0% real growth), Stocks ISA, super (locked until its ATO preservation age), other |
 | q50 + q11/q12 | investing steps: *now* → *during training* from course start → *as FO* from course start + 18 months |
 | q55, q66, q64/q65 | nominal return, withdrawal rate, other retirement income (default 7% / 4% / none — each logged as an assumption) |
 | q57 | `redirectAfterCoast` (spend instead of invest once coasting) |
@@ -60,6 +60,14 @@ Required: **q1** birth, **q4** retirement age, **q63** retirement income. Withou
 | q107/q110 | car purchase at FO start (or now), repeated every N years |
 | q113, q73, q58, q59 | trip, wedding, lump sum in, big purchase out — placed only if dated |
 | q116 | family holidays per year from first child (or FO start, or now) |
+| q14 | the part of training you pay yourself → one-off at course start (total alone → not placed) |
+| q15 | training loan → fixed annuity repayments for years×12 months from the start month, as yearly steps deflated to today's money |
+| q76 | parental leave → investing paused for N months from each birth (conservative; labelled) |
+| q99 (+q36) | mortgage from the month after buying for years×12 payments, level in today's money; rent you pay now stops then |
+| q111 | car running costs from the first planned car (FO start), or from now |
+| q21 / q3 | Captain upgrade / move back to the UK → **timeline marks only** (no pay or cost figures to use) |
+| q100, q87, q92 | "yes" with no figure (buying costs, university, faster fee inflation) → *not placed*, with the reason |
+| q11/q12 | timeline marks: training starts, First Officer (reduced scale) |
 
 Anything partially answered goes into `notPlaced` with the question number, so the Plan screen can say what's missing.
 Events dated before today or after retirement are dropped and noted.
@@ -72,8 +80,8 @@ Events dated before today or after retirement are dropped and noted.
 - After editing: `npm run check`, `npm run docs:questions`, and the e2e walk.
 
 ## Follow-ups (also in TASKS.md, T2.2a–f)
-a. Port `tests/e2e/onboarding.spec.js` into the Playwright suite from T0.2 and run it in CI.
-b. Map the remaining answers into the scenario: training cost/loan repayments (q14/q15), income during training (q16),
+a. ~~Port the walk into the Playwright suite and run it in CI.~~ Done (T2.2a).
+b. ~~Map the remaining answers~~ Done (T2.2b) except q16 (income during training: a choice with no amount — needs an amount question). Map the remaining answers into the scenario: training cost/loan repayments (q14/q15), income during training (q16),
    parental-leave dip (q76), mortgage payments + buying costs (q99/q100), university (q87), school-fee inflation (q92),
    car running costs (q111), captain upgrade (q21), UK return / relocation (q3) — each with tests.
 c. Let answers drive app settings: theme (q136), tone of "behind" messages (q134), budget style/period (q43/q44/q27),

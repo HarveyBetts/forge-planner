@@ -158,5 +158,18 @@ states (no dead buttons), **Settings** as grouped rows (Your answers, export/imp
 directions, milestone order/ages/pots. `tests/e2e/shell.spec.js` (4): no tab bar in onboarding; all five tabs in **light and
 dark** (URL, heading, active tab, no overflow, screenshots `artifacts/shell-*-{light,dark}.png`); #answers keeps Settings lit;
 browser back; deep link + reload; last content clears the tab bar; start over → onboarding with tab bar hidden.
-`npm run check` → 131/131; e2e 8/8.
+`npm run check` → 131/131; e2e 6/6.
 **Needs Harvey's eyes:** tab bar feel on the iPhone (height, blur, home-indicator spacing), indicator slide, and the Timeline list.
+
+## 2026-11-13 T2.2b — Remaining answers mapped into the plan
+**Changed:** `answersToScenario`: q14 (your share of training → one-off at course start), q15 (training loan → fixed annuity
+repayments, yearly steps deflated to today's money), q76 (investing paused N months after each birth), q99 + q36 (mortgage
+from the month after buying for years×12 payments; current rent stops), q111 (car running costs), q21 Captain and q3 UK
+return as **timeline marks only**, q100/q87/q92 answered "yes" without a figure → *not placed* with the reason. Every
+new figure is the user's own; none invented. Assumptions list explains each modelling choice. `docs/ONBOARDING.md` table updated.
+q16 (income during training) stays unmapped: it's a choice with no amount — needs a new amount question (noted).
+**Verified:** `tests/mapping.test.js` (11) — one per mapping, asserting exact months and amounts (e.g. loan: first payment
+Mar 2029, last Feb 2039, nothing Mar 2039, annuity amount exact, deflation per year; mortgage: Jul 2034 → Jun 2059 = 300
+payments, rent stops; leave: 0 investing Mar–Aug 2030 then back to £2,000), every scenario schema-valid and projectable.
+`npm run check` → 142/142.
+**Needs Harvey's eyes:** whether "investing pauses during parental leave" matches what you'd actually do (it's conservative).
