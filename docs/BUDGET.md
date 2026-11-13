@@ -29,3 +29,13 @@ From Google Sheets: File → Download → Microsoft Excel (.xlsx), then pick tha
 ## Privacy
 The workbook and its numbers never go into git, logs or any server. Tests use a made-up workbook with the same layout
 (`tests/fixtures/xlsx-fixture.js`).
+
+## Bank CSV import (T3.3, `src/budget/csv.js`)
+Budget → Money → **Import bank transactions (CSV)**. Any bank's CSV export works: with a header row (Monzo, Starling, most UK banks:
+Date / Name or Description / Amount, or Money in + Money out) or without (CommBank: date, amount, description, balance — columns
+are inferred). Dates may be day-first or month-first (detected), amounts like `-12.30`, `(12.30)`, `12.30 DR`, `$1,234.56`.
+The **Sort your transactions** screen groups them by place ("Woolworths Sydney"); pick a category once and Forge remembers it
+(`budget.rules`). Money coming in is guessed as Income. Amounts in another currency are converted at today's rate. Each
+transaction is added into its week's category total; every imported transaction is remembered by a fingerprint
+(`budget.imported`), so importing the same file again adds nothing. Rows that can't be read are listed, never guessed.
+No bank logins, ever (CLAUDE.md §3.3).

@@ -1,0 +1,6 @@
+Transaction ID,Date,Time,Type,Name,Emoji,Category,Amount,Currency,Local amount,Local currency,Notes and #tags,Address,Receipt,Description,Category split,Money Out,Money In
+tx_0001,02/12/2026,09:10:00,Card payment,Tesco,🛒,Groceries,-23.40,GBP,-23.40,GBP,,,,TESCO STORES 2345,,-23.40,
+tx_0002,02/12/2026,12:00:00,Card payment,Pret A Manger,☕,Eating out,-6.95,GBP,-6.95,GBP,,,,PRET A MANGER,,-6.95,
+tx_0003,04/12/2026,08:00:00,Faster payment,Employer Ltd,💷,Income,"2,100.00",GBP,"2,100.00",GBP,,,,SALARY DEC,,,"2,100.00"
+tx_0004,13/12/2026,10:00:00,Card payment,Tesco,🛒,Groceries,-31.05,GBP,-31.05,GBP,,,,TESCO STORES 2345,,-31.05,
+tx_0005,,10:00:00,Card payment,Mystery,❓,General,-1.00,GBP,-1.00,GBP,,,,MISSING DATE,,-1.00,

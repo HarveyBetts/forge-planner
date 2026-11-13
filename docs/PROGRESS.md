@@ -402,3 +402,19 @@ moves → updates q50 "now" only (training / First Officer amounts untouched).
 `tests/e2e/checkin.spec.js` (+1): sample budget with four weeks started → "more than the £500" → Plan with ≈£1,020 → q50 updated →
 card now says "in line with". Screenshot `artifacts/reality-check.png`. `npm run check` → 215/215; e2e 36/36.
 **Needs Harvey's eyes:** with your real sheet, does the "left over" figure match what you actually manage to put away?
+
+## 2026-11-13 T3.3 — Bank CSV import
+**Changed:** `src/budget/csv.js` (pure): RFC-4180 parser (quotes, CRLF, BOM), date and amount readers for the forms banks use,
+`detectColumns` (header names, or inferred columns for header-less files like CommBank; day-first vs month-first detected; Money
+in + Money out supported), `toTransactions` (malformed rows reported with line numbers and reasons, £0 holds dropped, a stable
+fingerprint per transaction — two identical coffees on one day both count), `merchantKey` (groups noisy descriptions), and
+`applyTransactions` (adds into the week's category total, skips anything already imported). Budget → Money → **Import bank
+transactions (CSV)** → **Sort your transactions** (new / already in / unreadable, expandable list of unreadable rows, "these
+amounts are in" currency with live conversion, one category per place with remembered choices and Income guessed for money in) →
+Add. `docs/BUDGET.md` section.
+**Verified:** `tests/csv.test.js` (8) with fixtures `tests/fixtures/commbank-sample.csv` (no header) and `monzo-sample.csv`
+(header) — made-up data: parsing, dates/amounts, column detection for both banks, malformed rows, money in/out, readable errors,
+merchant keys, weekly totals and re-import adding nothing. `tests/e2e/csv.spec.js` (2): CommBank file into the A$ budget → exact
+week totals (e.g. food A$178.20, rent A$1,100, income A$2,290) → same file again: 0 new / 6 already in → a £ Monzo file converted
+into A$; junk file → readable message. Screenshot `artifacts/csv-sort.png`. `npm run check` → 223/223; e2e 38/38.
+**Needs Harvey's eyes:** try an export from your bank app (CommBank: NetBank → Transactions → Export → CSV).

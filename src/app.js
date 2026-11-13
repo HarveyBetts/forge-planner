@@ -29,6 +29,7 @@ import { cashNow, netWorth, parseEntry, entryText, defaultWeek } from './budget/
 import { applyWhatIf, describeChanges, compareModel } from './ui/compare.js';
 import { checkinFields, valuesToQ49, makeSnapshot, trend, backupDue } from './ui/checkin.js';
 import { realityCheck } from './budget/reality.js';
+import { parseCSV, detectColumns, toTransactions, merchantKey, applyTransactions } from './budget/csv.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -816,6 +817,7 @@ let budget = null;        // loaded at boot from the store (this device only)
 let budWeek = null;       // Monday of the week on screen
 let budSeg = 'money';     // 'money' | 'invest'
 let snapshots = [];       // monthly check-ins, oldest first (T3.1) — loaded at boot
+let budCsv = null;        // { fileName, txns, bad, currency, groups } — a bank CSV waiting to be sorted (T3.3)
 let budPreview = null;    // { budget, report, fileName } — an import waiting for "Save"; nothing stored until then
 const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const bm = (x, c, compact = false) => money(x, c || (budget && budget.currency) || base(), { compact });
@@ -824,6 +826,7 @@ async function saveBudget(next) { budget = next; await data.saveBudget(next); }
 
 function budgetHTML() {
   if (budPreview) return budPreviewHTML();
+  if (budCsv && budget) return csvPreviewHTML();
   if (!budget) return budEmptyHTML();
   budWeek = budWeek || defaultWeek(budget, isoToday());
   const seg = `<div class="seg" role="tablist"><button role="tab" aria-selected="${budSeg === 'money'}" data-act="bud-seg" data-val="money">Money</button><button role="tab" aria-selected="${budSeg === 'invest'}" data-act="bud-seg" data-val="invest">Investments</button></div>`;
@@ -831,6 +834,8 @@ function budgetHTML() {
     ${budSeg === 'invest' ? investHTML() : `
     <section class="card nw" data-bud-nw>${netWorthHTML()}</section>
     <section class="card wk">${weekHTML()}</section>
+    <label class="btn as-label csv-btn">Import bank transactions (CSV)<input type="file" accept=".csv,text/csv" data-act="bud-csv" hidden></label>
+    <p class="err" role="alert" data-err></p>
     ${(() => { const { s } = buildScenario(); return s ? realityHTML(s) : ''; })()}
     <section class="card" data-bud-forecast>${forecastHTML()}</section>
     ${billsHTML()}`}
@@ -915,6 +920,63 @@ function investHTML() {
       : '<section class="card"><p class="mini">No holdings yet.</p></section>'}
     <button class="btn" data-act="bud-addlot">Add a purchase</button>`;
 }
+// ---- bank CSV (T3.3): read → group by merchant → you pick a category per merchant → add to the weeks ----
+async function budCsvFile(file) {
+  const err = (m) => { const el = app.querySelector('[data-err]'); if (el) el.textContent = m; };
+  try {
+    const rows = parseCSV(await file.text());
+    const cols = detectColumns(rows);
+    const { txns, bad } = toTransactions(rows, cols);
+    if (!txns.length) throw new Error(bad.length ? `None of the ${bad.length} rows could be read.` : 'No transactions in that file.');
+    const done = new Set(budget.imported || []);
+    const fresh = txns.filter((t) => !done.has(t.id));
+    const groups = {};
+    for (const t of fresh) {
+      const k = merchantKey(t.desc);
+      (groups[k] ||= { key: k, label: k.replace(/\b[a-z]/g, (c) => c.toUpperCase()), sample: t.desc, n: 0, total: 0 });
+      groups[k].n++; groups[k].total += t.amount;
+    }
+    budCsv = { fileName: file.name, txns: fresh, skipped: txns.length - fresh.length, bad, currency: budget.currency, groups: Object.values(groups).sort((a, b) => a.total - b.total) };
+    render('fwd');
+  } catch (e) { err(e.message || 'Couldn’t read that file.'); }
+}
+function csvGuess(g) {
+  const rules = budget.rules || {};
+  if (rules[g.key]) return rules[g.key];
+  if (g.total > 0) return (budget.categories.find((c) => c.kind === 'income') || {}).id || '';
+  return '';
+}
+function csvPreviewHTML() {
+  const C = budCsv;
+  const dates = C.txns.map((t) => t.date).sort();
+  const opts = (sel) => `<option value="">Skip</option>${budget.categories.map((c) => `<option value="${esc(c.id)}"${sel === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}`;
+  return `<header class="bar"><h1 class="h2">Sort your transactions</h1></header><div class="wrap">
+    <p class="sub">From <b>${esc(C.fileName)}</b>${dates.length ? `, ${SHORT(dates[0])} – ${SHORT(dates[dates.length - 1])}` : ''}. Pick a category for each place once — Forge remembers it next time. Nothing is added until you tap Add.</p>
+    <div class="card stats"><div><span class="stat-n">${C.txns.length}</span><span class="stat-l">new</span></div>
+      <div><span class="stat-n">${C.skipped}</span><span class="stat-l">already in</span></div><div><span class="stat-n">${C.bad.length}</span><span class="stat-l">unreadable</span></div></div>
+    ${C.bad.length ? `<details class="card"><summary class="rv-h">Rows Forge couldn’t read (${C.bad.length})</summary><ul class="bul">${C.bad.slice(0, 20).map((b) => `<li>Line ${b.line}: ${esc(b.reason)}</li>`).join('')}</ul></details>` : ''}
+    <div class="field"><label for="csv-cur">These amounts are in</label><select class="in" id="csv-cur" data-csv-cur>${['GBP', 'AUD', 'EUR', 'USD'].map((c) => `<option value="${c}"${c === C.currency ? ' selected' : ''}>${c}</option>`).join('')}</select>
+      ${C.currency !== budget.currency ? `<span class="sh-help">Converted to ${esc(budget.currency)} at today’s mid-market rate.</span>` : ''}</div>
+    ${C.groups.length ? `<section class="card list csv-g">${C.groups.map((g) => `<div class="row csv-r"><span class="row-l"><b>${esc(g.label)}</b><small>${g.n} × · ${money(g.total, C.currency)}</small><small class="csv-raw">${esc(g.sample)}</small></span>
+      <select class="in csv-sel" data-key="${esc(g.key)}" aria-label="Category for ${esc(g.label)}">${opts(csvGuess(g))}</select></div>`).join('')}</section>` : '<p class="banner">Everything in this file is already in your budget.</p>'}
+    <div class="stack"><button class="btn primary" data-act="csv-save" ${C.groups.length ? '' : 'disabled'}>Add to my budget</button><button class="btn" data-act="csv-cancel">Cancel</button></div>
+  </div>`;
+}
+async function csvSave() {
+  const picks = {};
+  app.querySelectorAll('.csv-sel').forEach((el) => { picks[el.dataset.key] = el.value; });
+  const cur = budCsv.currency;
+  const conv = (a) => (cur === budget.currency ? a : fx.convert(a, cur, budget.currency));
+  const rules = { ...(budget.rules || {}) };
+  for (const [k, v] of Object.entries(picks)) if (v) rules[k] = v;
+  const txns = budCsv.txns.map((t) => ({ ...t, amount: Math.round(conv(t.amount) * 100) / 100 }));
+  const { budget: next, added } = applyTransactions({ ...budget, rules }, txns, (t) => picks[merchantKey(t.desc)] || null);
+  await saveBudget(next);
+  budCsv = null;
+  render('back');
+  toast(added ? `Added ${added} transaction${added === 1 ? '' : 's'} to your weeks` : 'Nothing added — pick a category for at least one place');
+}
+
 // In-place refresh after a cell edit: keeps focus and scroll (no full re-render).
 function budRefreshParts() {
   const set = (sel, html) => { const el = app.querySelector(sel); if (el) el.innerHTML = html; };
@@ -1319,6 +1381,8 @@ app.addEventListener('click', (e) => {
   if (act === 'bud-import-cancel') { budPreview = null; return render('back'); }
   if (act === 'bud-import-save') { const b = budPreview.budget; budPreview = null; budWeek = null; saveBudget(b).then(() => { render('fwd'); toast('Budget imported'); }); return; }
   if (act === 'bud-use') return openUseBalances();
+  if (act === 'csv-save') { csvSave(); return; }
+  if (act === 'csv-cancel') { budCsv = null; return render('back'); }
   if (act === 'bud-price') return openPriceSheet(val);
   if (act === 'bud-addlot') return openAddLot();
   if (act === 'bud-remove') {
@@ -1383,6 +1447,8 @@ app.addEventListener('change', (e) => {
   const input = e.target;
   if (input.matches('.be')) { budCellChange(input); return; }
   if (input.matches('[data-act="bud-import"]') && input.files && input.files[0]) { budImportFile(input.files[0]); input.value = ''; return; }
+  if (input.matches('[data-act="bud-csv"]') && input.files && input.files[0]) { budCsvFile(input.files[0]); input.value = ''; return; }
+  if (input.matches('[data-csv-cur]') && budCsv) { budCsv = { ...budCsv, currency: input.value }; render('none', { keepScroll: true }); return; }
   if (!input.matches('[data-act="import"]') || !input.files || !input.files[0]) return;
   input.files[0].text().then((text) => {
     input.value = '';
