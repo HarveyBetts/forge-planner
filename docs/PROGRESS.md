@@ -294,3 +294,17 @@ gain £ and % — with totals that leave unpriced holdings out of the gain and l
 **Verified:** in `tests/budget.test.js`: parsing (incl. word-joiner characters), GBP/USD/GBX lots, mixed-case tickers merged,
 unpriced holding handled. (Committed with T3.2.)
 **Needs Harvey's eyes:** nothing yet.
+
+## 2026-11-13 T3.6 (part 1) — Read the .xlsx and map it by headings
+**Changed:** `src/budget/xlsx.js` — a dependency-free .xlsx reader (zip directory + browser `DecompressionStream('deflate-raw')`,
+injectable zlib for Node; shared / inline / formula-cached strings, numbers, booleans). `src/budget/importsheet.js` — finds the
+budget by its DATE + INCOME headings (categories = the columns up to TOTAL; weeks = the rows down to TOTAL; year inferred so weeks
+start on Mondays), the "Current" balance and "Premium Bonds Total" (number under the label), bills (a name next to "14th" /
+"4th May"), the "At End" table (→ pay lands 2 weeks late), and the investments by their TICKER tables (purchase lots + the saved
+live prices / currencies / company names). Missing pieces become warnings, never crashes.
+**Verified:** `tests/importsheet.test.js` (6) on a made-up workbook generated in the test with the same layout
+(`tests/fixtures/xlsx-fixture.js`, no personal data). Privately (not committed) against Harvey's real file: 30 weeks, 21
+categories, 7 bills, pay lag, Premium Bonds, 10 purchases / 5 holdings all priced; the app's 16 fortnightly balances equal the
+sheet's own cached values to the cent, and total cost matches exactly. `npm run check` → 201/201.
+**Needs Harvey's eyes:** nothing yet — the import screen comes with T3.7.
+
