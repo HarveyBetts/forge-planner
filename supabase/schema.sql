@@ -42,6 +42,16 @@ create table if not exists public.transactions (
   created_at  timestamptz not null default now()
 );
 
+-- What the app actually syncs (D25): one JSON document per user per key — 'onboarding', 'settings' (life events, what-ifs,
+-- assumptions), 'budget', 'snapshots', 'scenarios' — mirroring the on-device store exactly. Last write wins per document.
+create table if not exists public.user_docs (
+  user_id     uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  key         text not null check (key in ('onboarding','settings','budget','snapshots','scenarios')),
+  data        jsonb not null,
+  updated_at  timestamptz not null default now(),
+  primary key (user_id, key)
+);
+
 create table if not exists public.onboarding_answers (  -- one row per user: the boot-up questionnaire
   user_id     uuid primary key references auth.users(id) on delete cascade default auth.uid(),
   data        jsonb not null,               -- the state object from src/onboarding/state.js (v, mode, answers…)
@@ -59,7 +69,7 @@ create table if not exists public.ai_usage (     -- enforces per-user daily caps
 do $$
 declare t text;
 begin
-  foreach t in array array['scenarios','snapshots','budget_categories','transactions','onboarding_answers','ai_usage'] loop
+  foreach t in array array['user_docs','scenarios','snapshots','budget_categories','transactions','onboarding_answers','ai_usage'] loop
     if to_regclass('public.' || t) is null then continue; end if;
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "owner all" on public.%I', t);
@@ -92,3 +102,13 @@ begin
   return c <= p_cap;
 end $$;
 revoke all on function public.bump_ai_usage(uuid, int) from public, anon, authenticated;
+
+-- "Delete my account" (Settings): removes the signed-in user; their user_docs rows go with them (on delete cascade).
+create or replace function public.delete_my_account() returns void
+language plpgsql security definer set search_path = public, auth as $$
+begin
+  if auth.uid() is null then raise exception 'not signed in'; end if;
+  delete from auth.users where id = auth.uid();
+end $$;
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;

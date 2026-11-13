@@ -9,10 +9,16 @@ Claude Code appends here when blocked. Phases 0–3 need only **H1**. Do these i
 GitHub → `forge-planner` → Settings → Pages → Source: **GitHub Actions**. Every push to `main` then runs the checks and
 publishes the site at https://harveybetts.github.io/forge-planner/ . On your iPhone: open it in Safari → Share → Add to Home Screen.
 
-## H3 — Create a NEW Supabase project (Phase 4)
-Do **not** reuse the legacy Forge project. supabase.com → New project → copy the Project URL and the
-publishable/anon key (those two are safe to be public *only after* `schema.sql` is applied).
-Then: SQL editor → paste `supabase/schema.sql` → Run. Authentication → URL configuration → add your site URL.
+## H3 — Create a NEW Supabase project for sync (optional; ~10 min)
+Only needed if you want your data on more than one device. Forge works fully without it.
+1. supabase.com → **New project** (not the old Forge project). Region: Sydney. Save the database password somewhere safe.
+2. **SQL Editor** → New query → paste the whole of `supabase/schema.sql` from the forge-planner repo → **Run**. It's safe to re-run.
+3. **Authentication → URL Configuration**: Site URL = `https://harveybetts.github.io/forge-planner/`.
+4. **Project Settings → API**: copy the **Project URL** and the **anon public** (publishable) key. Never copy the `service_role` key anywhere.
+5. GitHub → forge-planner → `src/config.js` → ✏️ edit → paste them between the quotes:
+   `url: 'https://xxxx.supabase.co',` and `anonKey: '…',` → **Commit changes**. The site redeploys in ~2 minutes.
+6. In Forge: Settings → **Sync & account** → Create account (email + password) → your data uploads. On another phone: Sign in.
+Then do H4 once.
 
 ## H4 — Verify the database is locked down (Phase 4, 5 min)
 Run the queries in `supabase/tests/rls.sql` (Claude Code writes it in T4.4) while signed in as two different test users.

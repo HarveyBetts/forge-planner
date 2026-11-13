@@ -488,3 +488,16 @@ sourced estimates, never a promise, check big decisions with your provider / a r
   expected to stay well under a quarter-second on an iPhone.
 **Verified:** `tests/e2e/a11y.spec.js` (3) incl. the keyboard test. `npm run check` → 228/228; e2e 45/45.
 **Needs Harvey's eyes:** the primary-button blue is a touch deeper than before — tell me if it reads as "off brand".
+
+## 2026-11-13 T4.1 — Supabase store (against a mock until H3)
+**Changed:** `src/config.js` (public Supabase URL + anon key, blank = device-only; only `https://*.supabase.co` accepted; tests can
+inject a config). `src/data/supabase.js` — no-library client: email + password sign-up / sign-in, session persisted with refresh
+before expiry (a failed refresh signs out with a clear message), confirmation/magic-link redirect tokens, sign-out, delete account
+(rpc), and the `user_docs` documents (list / upsert / remove); readable errors that never contain tokens. `src/data/supabase-store.js`
+— the T0.3 store interface over those documents. `supabase/schema.sql` — new `user_docs` table (owner-only RLS like every table) and
+`delete_my_account()` (D25). `tests/fixtures/mock-supabase.js` — an in-memory Supabase that enforces owner-only access like the RLS
+policy. HUMAN_TODO H3 rewritten step by step; SECURITY checklist: no service-role key in client code.
+**Verified:** `tests/supabase.test.js` (6: config, auth, errors + confirmation, documents incl. two users never seeing each other's
+rows and anon getting nothing, refresh, delete account) and `tests/store-contract.test.js` — **the same contract run against
+LocalStore and SupabaseStore** (empty, scenarios, snapshots, settings/budget, export → clear → import). `npm run check` → 244/244.
+**Needs Harvey's eyes:** nothing until you decide to do H3 (only needed for more than one device).

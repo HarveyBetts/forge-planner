@@ -113,3 +113,13 @@ monthly-period budget (T3.2b) can sit alongside.
 **D24 — Phase 6/7 before Phase 4/5.** Backend sync (Phase 4) and the AI planner (Phase 5) can only be exercised against mocks until
 Harvey creates the Supabase project and an API key (H3–H5), while the PWA work (installable icon, offline use) and the plain-English
 README improve the app on his phone now. *Reverse:* none needed — Phase 4/5 are next.
+
+**D25 — Sync stores the app's own JSON documents, one row per user per key.** The handover schema had normalised tables
+(budget_categories, transactions, scenarios…) designed before Harvey's spreadsheet defined the budget (D23). The app keeps five
+documents on the device (onboarding answers, settings incl. life events and what-ifs, budget, check-ins, scenarios), so the cloud
+mirrors that: `user_docs(user_id, key, data jsonb, updated_at)`, owner-only RLS like every table, last write wins per document
+(T4.3), conflicts detected by content fingerprints + `updated_at`. Login is email + password via Supabase Auth's REST API (no
+library; magic links depend on Supabase's tightly rate-limited built-in email). Account deletion is a `security definer` function
+callable only by the signed-in user for themselves. The older tables stay in `schema.sql` (unused, still owner-locked) so nothing
+breaks if they're already created. T2.2f is met by the 'onboarding' document. *Reverse:* split documents into tables later if
+sharing or server-side queries are ever needed.
