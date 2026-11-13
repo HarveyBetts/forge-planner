@@ -63,7 +63,7 @@ Harvey's own spreadsheet (budget + investments) defines this phase — see D23. 
 - [x] **T6.1** `manifest.webmanifest`, icons (reuse legacy Forge icons from its public repo), service worker (cache-first shell, network-first data), iOS standalone meta. Accept: Lighthouse-style checks documented.
 - [ ] **T6.2** Accessibility + performance pass (focus order, contrast, aria on chart/ring, no layout shift, no infinite filters). Accept: checklist in PROGRESS.md.
 - [ ] **T6.3** Consistency pass: one motion/spacing/empty-state/wording language. Accept: screenshot set.
-- [ ] **T6.4** Privacy policy + "not financial advice" pages; data-export and deletion documented in-app.
+- [x] **T6.4** Privacy policy + "not financial advice" pages; data-export and deletion documented in-app.
 
 ## Phase 7 — Deploy & ops
 - [x] **T7.1** Confirm CI + Pages workflows work (first green deploy). Likely `[~]` until Harvey enables Pages (H2).

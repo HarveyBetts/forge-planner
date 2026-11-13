@@ -9,7 +9,7 @@ export const TABS = [
   { id: 'settings', label: 'Settings', icon: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>' },
 ];
 // Non-tab routes and the tab they belong to (keeps the tab highlighted while drilled in).
-export const SUB_ROUTES = { answers: 'settings' };
+export const SUB_ROUTES = { answers: 'settings', privacy: 'settings', advice: 'settings' };
 export const ROUTES = [...TABS.map((t) => t.id), ...Object.keys(SUB_ROUTES)];
 
 // '#plan' -> 'plan'; anything else (empty, unknown, '#a/b', '#x?y') -> null.

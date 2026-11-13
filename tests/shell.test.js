@@ -43,3 +43,10 @@ test('milestones: stages, events, coast and the end, in date order with ages and
   assert.ok(!m.some((x) => x.label === 'Old'), 'past events left out');
   if (p.coastDate) assert.ok(m.some((x) => x.kind === 'money' && /Coasting/.test(x.label)));
 });
+
+test('routes: privacy and advice pages live under Settings', () => {
+  assert.equal(parseRoute('#privacy'), 'privacy');
+  assert.equal(parseRoute('#advice'), 'advice');
+  assert.equal(tabOf('privacy'), 'settings');
+  assert.equal(slideDir('settings', 'advice'), 'fwd');
+});

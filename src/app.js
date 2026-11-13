@@ -68,7 +68,8 @@ function go(next, dir = 'fwd') {
 function render(dir = 'fwd', opts = {}) {
   quiet = !!opts.quiet;
   const screens = { welcome: welcomeHTML, question: questionHTML, review: reviewHTML, plan: planHTML,
-    timeline: timelineHTML, budget: budgetHTML, scenarios: scenariosHTML, settings: settingsHTML, paste: pasteHTML };
+    timeline: timelineHTML, budget: budgetHTML, scenarios: scenariosHTML, settings: settingsHTML, paste: pasteHTML,
+    privacy: privacyHTML, advice: adviceHTML };
   applyTheme(settingsFromAnswers(state.answers).theme);
   let html;
   try {
@@ -429,7 +430,7 @@ function planHTML() {
       <details class="card disc"><summary><span class="rv-h">Assumptions</span><span class="disc-n">${assumptions.length}</span><svg class="disc-c" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10l4 4 4-4"/></svg></summary>
         <div class="disc-b"><ul class="bul">${assumptions.map((t) => `<li>${esc(t)}${/estimate/i.test(t) ? ' <span class="tag">estimate</span>' : ''}</li>`).join('')}</ul>
         <p class="mini">Change any of these by editing your answers.</p></div></details>
-      <p class="foot">Estimates, not financial advice. All figures in today’s money.</p>
+      <p class="foot"><a href="#advice">Estimates, not financial advice.</a> All figures in today’s money.</p>
     </div>`;
 }
 
@@ -1251,6 +1252,8 @@ function settingsHTML() {
       <p class="list-note">Everything is stored on this phone only${store.persistent && data.persistent ? '' : ' — and this browser isn’t saving it, so back up now'}. Back up now and then; a backup is one file you can keep in iCloud Drive.</p>
     </section>
     <section class="card list"><h2 class="list-h">About</h2>
+      <a class="row" href="#privacy"><span class="row-l">Privacy — what’s stored and where</span><span class="row-c" aria-hidden="true">›</span></a>
+      <a class="row" href="#advice"><span class="row-l">Not financial advice</span><span class="row-c" aria-hidden="true">›</span></a>
       <p class="list-note">Forge is a planning tool. Estimates, not financial advice. All figures in today’s money.</p>
     </section>
   </div>`;
@@ -1330,6 +1333,45 @@ function parseBackupInfo(text) {
   return { when: d.exportedAt ? new Date(d.exportedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'an unknown date',
     answers: d.onboarding && d.onboarding.answers ? Object.keys(d.onboarding.answers).length : 0,
     events: d.settings && Array.isArray(d.settings.events) ? d.settings.events.length : 0, budget: !!d.budget };
+}
+
+// ---------------- privacy + not-advice pages (T6.4) ----------------
+const backBar = (title) => `<header class="bar"><a class="icon-btn" href="#settings" aria-label="Back to Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a><h1 class="h2">${title}</h1><span style="width:44px"></span></header>`;
+function privacyHTML() {
+  return `${backBar('Privacy')}<div class="wrap doc">
+    <section class="card"><h2 class="h3">The short version</h2><ul class="bul">
+      <li>Everything you put into Forge stays <b>on this phone</b>. There’s no account and nothing is uploaded.</li>
+      <li>Forge never asks for bank logins. Bank data only comes in as files you choose to import.</li>
+      <li>No adverts, no tracking, no analytics.</li></ul></section>
+    <section class="card"><h2 class="h3">What’s stored on this phone</h2><ul class="bul">
+      <li>Your answers to the questions, and the life events and what-ifs you add.</li>
+      <li>Your budget and investments (from your spreadsheet, bank CSVs or what you type), and monthly check-ins.</li>
+      <li>Settings, and a copy of the latest exchange rates.</li></ul>
+      <p class="mini">It’s kept in this browser’s storage for this site. Clearing Safari’s website data, or deleting the app from the home screen, can remove it — so back up.</p></section>
+    <section class="card"><h2 class="h3">What leaves the phone</h2><ul class="bul">
+      <li><b>Exchange rates</b>: Forge asks open.er-api.com for today’s rates. The request contains no personal data.</li>
+      <li><b>Fonts</b>: the Inter and Sora fonts load from Google Fonts, which sees your device’s IP address, like any website visit.</li>
+      <li><b>Spreadsheets and bank CSVs</b> you import are read on the phone and never sent anywhere.</li></ul></section>
+    <section class="card"><h2 class="h3">Your data, your call</h2><ul class="bul">
+      <li><b>Export</b>: Settings → Back up everything gives you one file with all of it.</li>
+      <li><b>Delete</b>: Settings → Delete all my data wipes it from this phone.</li>
+      <li>If syncing between devices is ever added, it will be opt-in, and only you will be able to read your data.</li></ul>
+      <div class="stack"><button class="btn" data-act="export">Back up everything</button><a class="btn" href="#settings">Back to Settings</a></div></section>
+  </div>`;
+}
+function adviceHTML() {
+  return `${backBar('Not financial advice')}<div class="wrap doc">
+    <section class="card"><h2 class="h3">Forge is a planning tool</h2>
+      <p>It does arithmetic on the numbers you give it and on assumptions you can see and change (returns, inflation, withdrawal rate, access ages). It doesn’t know your full situation and it isn’t regulated financial advice.</p></section>
+    <section class="card"><h2 class="h3">How to read the numbers</h2><ul class="bul">
+      <li>Everything is an <b>estimate</b>, shown in today’s money and as a range (low / middle / high returns). Real markets don’t move in straight lines.</li>
+      <li>Not modelled yet: tax, fees, sequence-of-returns risk, and currency swings beyond today’s exchange rate.</li>
+      <li>Pension and super access ages come from official sources (gov.uk, the ATO) and are marked as estimates — check with your scheme or fund.</li>
+      <li>Nothing here is a promise. Forge never says you <i>will</i> reach a number.</li></ul></section>
+    <section class="card"><h2 class="h3">Before a big decision</h2>
+      <p>Before acting on a big decision — moving a pension or super, borrowing for training, buying a home — check the details with your provider, and consider speaking to a regulated financial adviser.</p>
+      <a class="btn" href="#settings">Back to Settings</a></section>
+  </div>`;
 }
 
 // Preferences come from your answers; each row reopens that question and Save returns here.

@@ -456,3 +456,16 @@ import the spreadsheet, real balances, life events, monthly check-in), what each
 restore / delete, what to do if something breaks; developer notes kept short at the bottom.
 **Verified:** links and steps match the shipped UI labels (checked against `src/app.js`). `npm run check` green.
 **Needs Harvey's eyes:** read it once — anything confusing is a UI-wording bug too.
+
+## 2026-11-13 T6.4 — Privacy and "not financial advice" pages
+**Changed:** two in-app pages under Settings → About (routes `#privacy`, `#advice`, Settings tab stays lit, back button):
+**Privacy** — everything stays on the phone, no account, no bank logins, no tracking; exactly what's stored; what leaves the phone
+(exchange-rate requests to open.er-api.com with no personal data; Google Fonts sees the IP address; imported files never leave);
+export (with a Back up everything button right there) and delete; future sync would be opt-in and private. **Not financial advice** —
+a planning tool, estimates in today's money as ranges, what isn't modelled (tax, fees, sequence risk, FX swings), access ages are
+sourced estimates, never a promise, check big decisions with your provider / a regulated adviser. The Plan's footer
+"Estimates, not financial advice." links to it. (SECURITY.md rule 8 met for the local-only app; delete-account comes with accounts.)
+**Verified:** `tests/shell.test.js` (+1 routes). `tests/e2e/about.spec.js`: both pages reachable, key statements present, no
+"guarantee", backup downloads from the privacy page, footer link works, no overflow. Screenshot `artifacts/privacy.png`.
+`npm run check` → 228/228; e2e 42/42.
+**Needs Harvey's eyes:** read the two pages — they should match how you want Forge to treat people's data.
