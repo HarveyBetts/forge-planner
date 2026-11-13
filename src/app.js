@@ -14,6 +14,7 @@ import { ROUTES, parseRoute, tabOf, slideDir, syncTabBar } from './ui/shell.js';
 import { milestones } from './ui/milestones.js';
 import { settingsFromAnswers, behindCopy, applyTheme, LABELS } from './ui/settings.js';
 import { planSnapshot, diffSnapshots } from './ui/whatchanged.js';
+import { parsePastedAnswers, entriesToAnswers } from './onboarding/paste.js';
 import {
   projectScenario, projectFan, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -51,7 +52,7 @@ function go(next, dir = 'fwd') {
 function render(dir = 'fwd', opts = {}) {
   quiet = !!opts.quiet;
   const screens = { welcome: welcomeHTML, question: questionHTML, review: reviewHTML, plan: planHTML,
-    timeline: timelineHTML, budget: budgetHTML, scenarios: scenariosHTML, settings: settingsHTML };
+    timeline: timelineHTML, budget: budgetHTML, scenarios: scenariosHTML, settings: settingsHTML, paste: pasteHTML };
   applyTheme(settingsFromAnswers(state.answers).theme);
   const html = screens[screen.name]();
   app.innerHTML = `<main class="screen in-${dir}" id="main">${html}</main>`;
@@ -123,6 +124,7 @@ function welcomeHTML() {
       </button>
     </div>
     <p class="note">Saved on this device as you go. Stop any time and pick up where you left off. Skip anything you don’t know.</p>
+    <button class="link-btn" data-act="paste-open">Paste answers from the intake doc</button>
     <label class="link-btn">Restore answers from a backup<input type="file" accept="application/json,.json" data-act="import" hidden></label>
     ${persistBanner()}
   </section>`;
@@ -216,6 +218,47 @@ function changedHTML() {
     <a class="link-btn" href="#plan">See your plan</a></section>`;
 }
 
+// ---------------- paste answers from the intake doc (nothing saved until "Save") ----------------
+function pasteHTML() {
+  const back = '<button class="icon-btn" data-act="paste-cancel" aria-label="Cancel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+  if (!screen.result) {
+    return `<header class="bar">${back}<h1 class="h2">Paste answers</h1><span style="width:44px"></span></header>
+      <div class="wrap">
+        <p class="sub">Paste the answers you typed in the Forge intake doc — one per line, starting with the question number (e.g. “1. March 1997”). You’ll check everything before it’s saved.</p>
+        <textarea class="in paste-in" name="paste" rows="10" placeholder="1. March 1997&#10;4. 55&#10;63. £50k a year" autocapitalize="off" spellcheck="false">${esc(screen.text || '')}</textarea>
+        <p class="err" role="alert" data-err></p>
+        <button class="btn primary" data-act="paste-read">Read answers</button>
+      </div>`;
+  }
+  const { entries, problems } = screen.result;
+  const ok = entries.filter((e) => !e.error);
+  const bad = entries.filter((e) => e.error);
+  const row = (e) => {
+    const def = BY_ID[e.id];
+    const cur = state.answers[e.id];
+    const ans = e.error ? '' : e.unknown ? 'Don’t know' : summarize(def, { v: e.value });
+    const replaces = !e.error && cur && JSON.stringify(cur) !== JSON.stringify(e.unknown ? { unknown: true } : { v: e.value });
+    return `<li class="pv ${e.error ? 'pv-bad' : ''}"><span class="rv-n">${e.n}</span><span class="rv-body">
+      <span class="rv-q">${esc(def.text)}</span>
+      ${e.error ? `<span class="pv-err">${esc(e.error)}</span><span class="pv-raw">You wrote: “${esc(e.raw)}”</span>` : `<span class="rv-a">${esc(ans)}</span>`}
+      ${e.note ? `<span class="pv-note">${esc(e.note)}</span>` : ''}
+      ${replaces ? '<span class="pv-note">Replaces your current answer.</span>' : ''}</span></li>`;
+  };
+  return `<header class="bar">${back}<h1 class="h2">Check your answers</h1><span style="width:44px"></span></header>
+    <div class="wrap">
+      <div class="card stats"><div><span class="stat-n">${ok.length}</span><span class="stat-l">ready</span></div>
+        <div><span class="stat-n">${bad.length}</span><span class="stat-l">need you</span></div>
+        <div><span class="stat-n">${problems.length}</span><span class="stat-l">notes</span></div></div>
+      ${bad.length ? `<section class="card rv"><h2 class="rv-h">Couldn’t read these — answer them in the app</h2><ul class="rv-list">${bad.map(row).join('')}</ul></section>` : ''}
+      ${ok.length ? `<section class="card rv"><h2 class="rv-h">Ready to save</h2><ul class="rv-list">${ok.map(row).join('')}</ul></section>` : ''}
+      ${problems.length ? `<section class="card"><h2 class="rv-h">Notes</h2><ul class="bul">${problems.map((p) => `<li>${esc(p.message)}</li>`).join('')}</ul></section>` : ''}
+      <div class="stack">
+        <button class="btn primary" data-act="paste-save" ${ok.length ? '' : 'disabled'}>Save ${ok.length} answer${ok.length === 1 ? '' : 's'}</button>
+        <button class="btn" data-act="paste-edit">Edit what I pasted</button>
+      </div>
+    </div>`;
+}
+
 // ---------------- review ----------------
 function reviewHTML() {
   const p = progress(state.answers, state.mode || 'full');
@@ -248,6 +291,7 @@ function reviewHTML() {
       </div>
       ${groups}
       <div class="stack">
+        <button class="btn" data-act="paste-open">Paste answers from the intake doc</button>
         <button class="btn" data-act="export">Export a backup</button>
         <label class="btn as-label">Import a backup<input type="file" accept="application/json,.json" data-act="import" hidden></label>
         <button class="btn danger" data-act="reset">${screen.confirmReset ? 'Tap again to delete all answers' : 'Start over'}</button>
@@ -553,6 +597,23 @@ app.addEventListener('click', (e) => {
     if (screen.returnTo) return go({ name: screen.returnTo }, 'back');
     const p = prevQuestion(state.answers, state.mode, screen.id);
     return p ? go({ name: 'question', id: p.id }, 'back') : go({ name: 'welcome' }, 'back');
+  }
+  if (act === 'paste-open') return go({ name: 'paste', from: screen.name === 'welcome' ? 'welcome' : 'review' });
+  if (act === 'paste-cancel') return go({ name: screen.from || 'review' }, 'back');
+  if (act === 'paste-edit') { screen = { ...screen, result: null }; return render('back'); }
+  if (act === 'paste-read') {
+    const text = app.querySelector('[name="paste"]').value;
+    const result = parsePastedAnswers(text, { base: base() });
+    if (!result.entries.length) { app.querySelector('[data-err]').textContent = 'No numbered answers found. Start each line with the question number, e.g. “1. March 1997”.'; return; }
+    screen = { ...screen, text, result };
+    return render('fwd');
+  }
+  if (act === 'paste-save') {
+    const add = entriesToAnswers(screen.result.entries);
+    const before = planReady() ? planSnap() : undefined;
+    state = store.save({ ...state, answers: { ...state.answers, ...add }, mode: state.mode || 'full', startedAt: state.startedAt || new Date().toISOString() });
+    pendingChange = { n: null, lines: [`Saved ${Object.keys(add).length} answers from your paste.`, ...(before !== undefined ? diffSnapshots(before, planSnap(), { currency: base() }) : [])] };
+    return go({ name: 'review' }, 'back');
   }
   if (act === 'export') return download(`forge-answers-${currentMonth()}.json`, exportAnswers(state));
   if (act === 'reset') {

@@ -84,9 +84,9 @@ a. ~~Port the walk into the Playwright suite and run it in CI.~~ Done (T2.2a).
 b. ~~Map the remaining answers~~ Done (T2.2b) except q16 (income during training: a choice with no amount — needs an amount question). Map the remaining answers into the scenario: training cost/loan repayments (q14/q15), income during training (q16),
    parental-leave dip (q76), mortgage payments + buying costs (q99/q100), university (q87), school-fee inflation (q92),
    car running costs (q111), captain upgrade (q21), UK return / relocation (q3) — each with tests.
-c. Let answers drive app settings: theme (q136), tone of "behind" messages (q134), budget style/period (q43/q44/q27),
+c. ~~Done (T2.2c).~~ Let answers drive app settings: theme (q136), tone of "behind" messages (q134), budget style/period (q43/q44/q27),
    notifications (q133), overspend flags (q47).
-d. "What changed" summary when an edited answer moves the plan (e.g. coast date +3 years).
-e. Paste-in import of answers typed in the "Forge intake" doc (numbered lines) → review screen → confirm before saving.
+d. ~~Done (T2.2d).~~ "What changed" summary when an edited answer moves the plan (e.g. coast date +3 years).
+e. ~~Done (T2.2e) — Welcome and Your answers → “Paste answers from the intake doc”.~~ Paste-in import of answers typed in the "Forge intake" doc (numbered lines) → review screen → confirm before saving.
 f. Phase 4: sync answers to Supabase (`onboarding_answers` table is already in `supabase/schema.sql`); add the
    Supabase origin to the CSP `connect-src` in `index.html` at the same time.

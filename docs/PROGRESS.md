@@ -200,3 +200,18 @@ retirement spend moves the target and pushes coast later. `tests/e2e/whatchanged
 target change, disappears after navigating; a theme edit says nothing moved. Screenshot `artifacts/what-changed.png`.
 `npm run check` → 155/155; e2e 12/12.
 **Needs Harvey's eyes:** whether the card should also appear on the Plan screen itself.
+
+## 2026-11-13 T2.2e — Paste in answers from the intake doc
+**Changed:** `src/onboarding/paste.js` — `parsePastedAnswers` (numbered lines “1.” “Q4:” “7)” “11 -” “Q12 …”; wrapped lines
+join the previous answer; echoed question text stripped; duplicates → last wins with a note; unknown numbers and un-numbered
+lines reported), readers for months (“Sept 27”, “03/1997”, “15/03/1997”…), money (“£50k”, “A$15,200”, “15200 aud”, “1.2m”; a
+bare “$” is read as A$ with a note), numbers, fuzzy choices (exact → prefix → contains; ambiguity is an error, not a guess),
+multi-choice lists, field answers (“ISA: 14,000; super: A$15,200” or positional only when the count matches, flagged
+“check each part”), and “don’t know” (unless “Not sure” is a real option). Every value goes through the normal validator.
+UI: “Paste answers from the intake doc” on Welcome and Your answers → paste → **Check your answers** preview (ready / need you
+/ notes, “Replaces your current answer” flags, what you wrote for unreadable ones) → **Save N answers** or edit/cancel.
+**Verified:** `tests/paste.test.js` (9) incl. a deliberately messy paste and unreadable answers never becoming values.
+`tests/e2e/paste.spec.js`: empty paste error, preview counts, storage byte-identical after Read / Edit / Cancel (nothing saved
+without confirmation), then Save stores exactly the 5 readable answers. Screenshot `artifacts/paste-preview.png`.
+`npm run check` → 164/164; e2e 13/13.
+**Needs Harvey's eyes:** try pasting your real intake-doc answers — anything it can't read is listed with the reason.
