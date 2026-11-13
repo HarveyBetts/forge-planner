@@ -170,7 +170,7 @@ function welcomeHTML() {
   </section>`;
 }
 function brand() {
-  return `<div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--accent)"/><path d="M10 23V9h12M10 16h9" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>Forge</span></div>`;
+  return `<div class="brand"><img src="icons/icon.svg" alt="" width="34" height="34" class="brand-ic"><span>Forge</span></div>`;
 }
 
 // ---------------- question ----------------
@@ -1535,6 +1535,15 @@ Promise.all([
   data.getBudget().then((b) => { budget = b; }),
   data.listSnapshots().then((l) => { snapshots = l; }),
 ]).catch(() => {}).finally(() => render('none'));
+// Offline app shell (T6.1): only over HTTPS (GitHub Pages), never on local test servers.
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('Offline mode unavailable:', e));
+  let had = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (had) toast('Forge updated — the new version is ready next time you open it');
+    had = true;
+  });
+}
 // Live FX in the background; if the plan is on screen and rates changed, refresh it in place.
 {
   const before = JSON.stringify(fx.rates());

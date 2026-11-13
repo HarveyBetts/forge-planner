@@ -109,3 +109,7 @@ Differences: live FX instead of a typed exchange rate; prices come from the file
 GOOGLEFINANCE in a web app (live prices need the backend, later). His workbook is read on the device only; its figures are never
 committed, logged or sent anywhere. Done before T2.7–T2.9 because he asked for it directly. *Reverse:* none needed — the
 monthly-period budget (T3.2b) can sit alongside.
+
+**D24 — Phase 6/7 before Phase 4/5.** Backend sync (Phase 4) and the AI planner (Phase 5) can only be exercised against mocks until
+Harvey creates the Supabase project and an API key (H3–H5), while the PWA work (installable icon, offline use) and the plain-English
+README improve the app on his phone now. *Reverse:* none needed — Phase 4/5 are next.

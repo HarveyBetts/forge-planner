@@ -5,7 +5,7 @@ Claude Code appends here when blocked. Phases 0–3 need only **H1**. Do these i
 ## H1 — Own GitHub repo ✅ done (13 Nov 2026)
 `HarveyBetts/forge-planner`, public. The planner was moved in with its own history (DECISIONS D21).
 
-## H2 — Turn on hosting (1 min)
+## H2 — Turn on hosting ✅ done (Pages runs on every push to main)
 GitHub → `forge-planner` → Settings → Pages → Source: **GitHub Actions**. Every push to `main` then runs the checks and
 publishes the site at https://harveybetts.github.io/forge-planner/ . On your iPhone: open it in Safari → Share → Add to Home Screen.
 

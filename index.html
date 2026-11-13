@@ -7,6 +7,13 @@
 <meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Forge">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Plan a financial future around real life milestones. Estimates, not financial advice.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://open.er-api.com">
 <title>Forge</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,7 +56,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
 .center{text-align:center;align-items:center}
 .brand{display:flex;align-items:center;gap:10px;font:700 20px Sora,Inter,sans-serif;margin:12px 0 18px}
 .center .brand{justify-content:center}
-.brand svg{width:34px;height:34px}
+.brand svg,.brand-ic{width:34px;height:34px;border-radius:9px}
 .h1{font:700 28px/1.15 Sora,Inter,sans-serif;margin:0;letter-spacing:-.01em}.h1.big{font-size:34px}
 .h2{font:700 22px Sora,Inter,sans-serif;margin:0}
 .sub{color:var(--muted);margin:0;font-size:16px}

@@ -430,3 +430,22 @@ your planned £1,500 a month of investing becomes optional — about A$649 a wee
 (default nudge) → edit to 60 → "of A$100"; coast card shows A$649 a week; "Loud and clear" → banner; "Don’t flag it" → no bar, no
 warning words. Screenshot `artifacts/plan-vs-actual.png`. `npm run check` → 224/224; e2e 40/40.
 **Needs Harvey's eyes:** set plans for your big categories (rent, food) and see if the nudges feel right.
+
+## 2026-11-13 T7.1 — CI + Pages confirmed
+**Verified:** every push since the e2e fix has a green **CI** run (unit checks + the full Playwright suite on GitHub's Ubuntu) and
+a successful **Deploy to GitHub Pages** run (e.g. T3.3: CI run 13 ✅, Pages run 13 ✅). The site is live at
+https://harveybetts.github.io/forge-planner/ . H2 marked done.
+
+## 2026-11-13 T6.1 — Installable, offline Forge
+**Changed:** `manifest.webmanifest` (standalone, colours, icons), `icons/` (192, 512, maskable 512, apple-touch 180, favicon 32, SVG)
+**rendered from the original Forge "blades" logo** (its vector paths taken from the old app and composed on the same blue gradient),
+iOS head tags (status bar, apple-touch-icon, description), `sw.js` (cache-first app shell; same-origin GETs only; navigations and
+deep links get the cached page; FX and fonts untouched; old versions' caches deleted on activate), `build-site.sh` stamps the worker
+with a version and the exact staged file list (and also refuses `.xlsx`). The app registers the worker only over HTTPS and toasts when
+an update is ready. Welcome screen uses the real icon. Checklist in `docs/PWA.md` (D24: Phase 6/7 before mock-only backend work).
+**Verified:** `tests/pwa.test.js` (3): manifest + icon files + head tags; the built worker's precache list equals exactly the staged
+files and contains nothing from data/docs/tests; the worker run in a sandbox installs, clears an old version, serves cache-first,
+serves the shell for navigations, works offline, ignores cross-origin and POST. `tests/e2e/pwa.spec.js`: the built site installs
+its worker in Chromium, then **opens with the network cut**, deep link included. `npm run check` → 227/227; e2e 41/41.
+**Needs Harvey's eyes:** delete the current home-screen icon, re-add from Safari (Share → Add to Home Screen) to get the new icon;
+then try opening it in flight mode.

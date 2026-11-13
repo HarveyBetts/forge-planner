@@ -60,11 +60,11 @@ Harvey's own spreadsheet (budget + investments) defines this phase — see D23. 
 - [ ] **T5.3** Prompt suite: 10 representative questions (e.g. "what if I return to the UK in 2028?") with expected qualities; a markdown eval doc. Accept: eval doc committed.
 
 ## Phase 6 — PWA & polish
-- [ ] **T6.1** `manifest.webmanifest`, icons (reuse legacy Forge icons from its public repo), service worker (cache-first shell, network-first data), iOS standalone meta. Accept: Lighthouse-style checks documented.
+- [x] **T6.1** `manifest.webmanifest`, icons (reuse legacy Forge icons from its public repo), service worker (cache-first shell, network-first data), iOS standalone meta. Accept: Lighthouse-style checks documented.
 - [ ] **T6.2** Accessibility + performance pass (focus order, contrast, aria on chart/ring, no layout shift, no infinite filters). Accept: checklist in PROGRESS.md.
 - [ ] **T6.3** Consistency pass: one motion/spacing/empty-state/wording language. Accept: screenshot set.
 - [ ] **T6.4** Privacy policy + "not financial advice" pages; data-export and deletion documented in-app.
 
 ## Phase 7 — Deploy & ops
-- [ ] **T7.1** Confirm CI + Pages workflows work (first green deploy). Likely `[~]` until Harvey enables Pages (H2).
+- [x] **T7.1** Confirm CI + Pages workflows work (first green deploy). Likely `[~]` until Harvey enables Pages (H2).
 - [ ] **T7.2** README for Harvey (non-technical): how to open the app, back up data, what to do if something breaks.
