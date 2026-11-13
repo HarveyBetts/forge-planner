@@ -13,6 +13,7 @@ import { whatMustBeTrue } from './engine/solve.js';
 import { ROUTES, parseRoute, tabOf, slideDir, syncTabBar } from './ui/shell.js';
 import { milestones } from './ui/milestones.js';
 import { settingsFromAnswers, behindCopy, applyTheme, LABELS } from './ui/settings.js';
+import { planSnapshot, diffSnapshots } from './ui/whatchanged.js';
 import {
   projectScenario, projectFan, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -172,7 +173,9 @@ function saveCurrent() {
   }
   const err = validateValue(def, value);
   if (err) { errEl.textContent = err; return false; }
+  const before = screen.returnTo ? planSnap() : undefined;
   state = store.save(setAnswer(state, def.id, value));
+  noteChange(before, def);
   return true;
 }
 function advance(fromId) {
@@ -188,6 +191,29 @@ function finish() {
   state = store.save({ ...state, completedAt: state.completedAt || new Date().toISOString() });
   const missing = REQUIRED_FOR_PLAN.filter((id) => !(state.answers[id] && !state.answers[id].unknown));
   go({ name: missing.length ? 'review' : 'plan' });
+}
+
+// ---------------- what changed (after editing an answer) ----------------
+let pendingChange = null;
+function planSnap() {
+  try {
+    const out = answersToScenario(state.answers, { today: currentMonth(), convert: (a, from, to) => fx.convert(a, from, to) });
+    return out.scenario ? planSnapshot(out.scenario, projectScenario(out.scenario)) : null;
+  } catch { return null; }
+}
+function noteChange(before, def) {
+  if (before === undefined) return;
+  pendingChange = { n: def.n, lines: diffSnapshots(before, planSnap(), { currency: base() }) };
+}
+// One-shot card at the top of the screen you return to.
+function changedHTML() {
+  if (!pendingChange) return '';
+  const { n, lines } = pendingChange;
+  pendingChange = null;
+  if (!lines.length) return `<p class="banner changed" role="status">Saved question ${n}. Your plan’s numbers didn’t change.</p>`;
+  return `<section class="card changed" role="status"><h2 class="rv-h">What changed</h2>
+    <ul class="bul">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>
+    <a class="link-btn" href="#plan">See your plan</a></section>`;
 }
 
 // ---------------- review ----------------
@@ -210,6 +236,7 @@ function reviewHTML() {
   }).join('');
   return `<header class="bar"><h1 class="h2">Your answers</h1>${planReady() ? '<button class="btn small primary" data-act="plan">My plan</button>' : ''}</header>
     <div class="wrap">
+      ${changedHTML()}
       ${missing.length ? `<p class="banner warn" role="status">Forge needs ${missing.map((id) => `question ${BY_ID[id].n}`).join(', ')} to build your plan: ${missing.map((id) => esc(BY_ID[id].text)).join(' ')}</p>` : ''}
       <div class="card stats">
         <div><span class="stat-n">${full.done}</span><span class="stat-l">answered</span></div>
@@ -417,6 +444,7 @@ function scenariosHTML() {
 function settingsHTML() {
   const full = progress(state.answers, 'full');
   return `<header class="bar"><h1 class="h2">Settings</h1></header><div class="wrap">
+    ${changedHTML()}
     <section class="card list"><h2 class="list-h">Your plan</h2>
       <a class="row" href="#answers"><span class="row-l">Your answers</span><span class="row-v">${full.done} of ${full.total}</span><span class="row-c" aria-hidden="true">›</span></a>
     </section>
@@ -514,7 +542,12 @@ app.addEventListener('click', (e) => {
     return;
   }
   if (act === 'next') { if (saveCurrent()) advance(screen.id); return; }
-  if (act === 'unknown') { state = store.save(setUnknown(state, screen.id)); return advance(screen.id); }
+  if (act === 'unknown') {
+    const before = screen.returnTo ? planSnap() : undefined;
+    state = store.save(setUnknown(state, screen.id));
+    noteChange(before, BY_ID[screen.id]);
+    return advance(screen.id);
+  }
   if (act === 'skip') return advance(screen.id);
   if (act === 'back') {
     if (screen.returnTo) return go({ name: screen.returnTo }, 'back');

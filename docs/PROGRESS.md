@@ -187,3 +187,16 @@ background is the dark token; survives reload), Light on a dark phone, Gently �
 fallback label and × returning to Settings. Screenshots `artifacts/settings-dark-override.png`, `artifacts/plan-tone-blunt.png`.
 `npm run check` → 150/150; e2e 10/10.
 **Needs Harvey's eyes:** the three tones' wording — pick the one that sounds like you want to be spoken to.
+
+## 2026-11-13 T2.2d — "What changed" after editing an answer
+**Changed:** `src/ui/whatchanged.js` — `planSnapshot` (status, coast date, run-out month, target, pot at stop-work age) and
+`diffSnapshots` → plain-English lines ("Coast date moved from Mar 2031 to Feb 2034 (2 years 11 months later).", "Status:
+Behind → Runs short.", "Your savings no longer run out.", "Target pot: £1.0M → £1.5M."), ignoring moves under 0.5%/£100.
+The app snapshots the plan before and after an edited answer (Save or Don't know) and shows a one-shot **What changed** card
+at the top of the screen you return to (Your answers or Settings), or "Saved question N. Your plan’s numbers didn’t change."
+**Verified:** `tests/whatchanged.test.js` (5): coast later/sooner/new/lost with spans, status + run-out + age + target + pot
+(shortfall wording), noise threshold, plan appearing/disappearing, AUD formatting, and a real answers→engine run where raising
+retirement spend moves the target and pushes coast later. `tests/e2e/whatchanged.spec.js` (2): edit q63 → card shows the
+target change, disappears after navigating; a theme edit says nothing moved. Screenshot `artifacts/what-changed.png`.
+`npm run check` → 155/155; e2e 12/12.
+**Needs Harvey's eyes:** whether the card should also appear on the Plan screen itself.
