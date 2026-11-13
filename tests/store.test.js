@@ -162,3 +162,15 @@ test('store: budget save/get and it rides along in backups; damaged budget rejec
   assert.deepEqual(await s.getBudget(), b);
   await assert.rejects(() => s.importAll(JSON.stringify({ app: 'forge', kind: 'full-backup', v: 1, budget: { v: 1 } })), /budget in that backup is damaged/);
 });
+
+import { createStore } from '../src/onboarding/state.js';
+test('both stores know storage is unusable before the first save (so the first screen can warn)', () => {
+  const ro = memoryStorage(); ro.setItem = () => { throw new Error('QuotaExceededError'); };
+  assert.equal(createLocalStore({ storage: ro }).persistent, false);
+  assert.equal(createStore(ro).persistent, false);
+  assert.equal(createStore(null).persistent, false);
+  const ok = memoryStorage();
+  assert.equal(createLocalStore({ storage: ok }).persistent, true);
+  assert.equal(createStore(ok).persistent, true);
+  assert.equal(ok.getItem('forge.probe'), null); // probe leaves nothing behind
+});

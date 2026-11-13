@@ -13,8 +13,11 @@ export function createStore(storage) {
   if (backend === undefined) {
     try { backend = globalThis.localStorage; } catch { backend = null; }
   }
+  // Probe once: blocked or full storage (private mode, quota) should warn from the very first screen.
+  let canWrite = false;
+  try { if (backend) { backend.setItem('forge.probe', '1'); backend.removeItem('forge.probe'); canWrite = true; } } catch { canWrite = false; }
   const store = {
-    persistent: true,
+    persistent: canWrite,
     load() {
       if (mem) return mem;
       let raw = null;

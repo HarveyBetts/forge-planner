@@ -66,7 +66,14 @@ function render(dir = 'fwd', opts = {}) {
   const screens = { welcome: welcomeHTML, question: questionHTML, review: reviewHTML, plan: planHTML,
     timeline: timelineHTML, budget: budgetHTML, scenarios: scenariosHTML, settings: settingsHTML, paste: pasteHTML };
   applyTheme(settingsFromAnswers(state.answers).theme);
-  const html = screens[screen.name]();
+  let html;
+  try {
+    html = (screens[screen.name] || screens.welcome)();
+  } catch (err) {
+    // Safety net (T2.9): never a blank screen. The data on the phone is untouched.
+    console.warn('Forge screen error:', err);
+    html = crashHTML(err);
+  }
   app.innerHTML = `<main class="screen in-${dir}" id="main">${html}</main>`;
   const main = app.firstElementChild;
   const shell = inShell(screen.name);
@@ -90,6 +97,22 @@ document.addEventListener('click', (e) => {
   if (!a || tabOf(lastRoute) !== a.dataset.tab || lastRoute !== a.dataset.tab) return;
   e.preventDefault();
   window.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' });
+});
+function crashHTML(err) {
+  return `<header class="bar"><h1 class="h2">Something went wrong</h1></header><div class="wrap" data-crash>
+    <section class="card empty"><span class="empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.5M12 16v.2"/></svg></span>
+      <h2 class="h3">This screen hit a problem</h2>
+      <p class="sub">Your answers, events and budget are safe on this phone. Back up to be sure, then try again — and tell Claude what you tapped.</p>
+      <button class="btn primary" data-act="export">Back up everything</button>
+      <a class="btn" href="#answers" data-act="crash-answers">Go to your answers</a>
+      <button class="btn ghost" data-act="crash-reload">Reload</button>
+      <details class="mini"><summary>Details for Claude</summary><code>${esc(String(err && err.message || err))}</code></details>
+    </section></div>`;
+}
+// Anything async that fails (a save, a file read) gets a calm message instead of silently doing nothing.
+window.addEventListener('unhandledrejection', (e) => {
+  console.warn('Forge async error:', e.reason);
+  try { toast('Something didn’t save — please try again'); } catch { /* toast unavailable */ }
 });
 function focusFirst(root) {
   const el = root.querySelector('input.in:not([type=hidden]), textarea.in, select.in');
@@ -808,6 +831,7 @@ async function budCellChange(input) {
 }
 async function budImportFile(file) {
   const err = (m) => { const el = app.querySelector('[data-err]'); if (el) el.textContent = m; };
+  err('Reading your spreadsheet…');
   try {
     const wb = await readXlsx(await file.arrayBuffer());
     const out = workbookToBudget(wb, { today: isoToday(), base: base() });
@@ -1232,6 +1256,8 @@ app.addEventListener('click', (e) => {
     return go({ name: 'review' }, 'back');
   }
   if (act === 'export') { exportEverything(); return; }
+  if (act === 'crash-reload') { location.reload(); return; }
+  if (act === 'crash-answers') { screen = { name: 'review' }; if (location.hash === '#answers') render('fwd'); else location.hash = '#answers'; return; }
   if (act === 'set-num') return openNumberSetting(val);
   if (act === 'wipe') {
     if (!screen.confirmWipe) { screen = { ...screen, confirmWipe: true }; return render('none', { keepScroll: true }); }

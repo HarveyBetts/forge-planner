@@ -1,33 +1,9 @@
 // E2E walk: quick-start onboarding at iPhone size with SAMPLE answers (not Harvey's) → Plan screen.
 // Replaces the old standalone tests/e2e/onboarding.walk.mjs (T2.2a). Screenshots go to artifacts/.
 import { test, expect } from '@playwright/test';
-import { prepare, fresh, expectNoOverflow, ART } from './helpers.js';
+import { prepare, fresh, expectNoOverflow, walkQuickStart, ART } from './helpers.js';
 import { SAMPLE } from './fixtures.js';
 
-
-// Answer every quick-start question from `answers`; anything not listed gets "Don't know".
-export async function walkQuickStart(page, answers = SAMPLE, shots = {}) {
-  await page.getByRole('button', { name: /Quick start/ }).click();
-  for (let i = 0; i < 80; i++) {
-    const form = page.locator('[data-form]');
-    if (!(await form.count())) break;
-    const id = await form.getAttribute('data-qid');
-    const a = answers[id];
-    await expectNoOverflow(page, id);
-    if (!a) { await page.click('[data-act="unknown"]'); await page.waitForFunction((q) => document.querySelector('[data-form]')?.dataset.qid !== q, id); continue; }
-    if (a.month) await page.fill('[name="v"]', a.month);
-    if (a.num || a.money) await page.fill('[name="v"]', a.num || a.money);
-    if (a.fields) for (const [n, val] of Object.entries(a.fields)) await page.fill(`[name="${n}"]`, val);
-    if (shots[id] && !a.pick) await page.screenshot({ path: `${ART}/${shots[id]}.png` });
-    if (a.pick) {
-      await page.click(`[data-act="pick"][data-val="${a.pick}"]`);
-      if (shots[id]) await page.screenshot({ path: `${ART}/${shots[id]}.png` });
-    } else {
-      await page.click('[data-act="next"]');
-    }
-    await page.waitForFunction((q) => document.querySelector('[data-form]')?.dataset.qid !== q, id);
-  }
-}
 
 test('quick-start onboarding → plan, resumes after reload', async ({ page }) => {
   const errors = await prepare(page);

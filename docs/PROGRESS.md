@@ -362,3 +362,17 @@ T2.8 renamed Settings' "Start over" to "Delete all my data" but `tests/e2e/shell
 failed on the T2.8 and T2.7 pushes (the site kept deploying — Pages only gates on `npm run check`). Test updated; full e2e suite
 30/30 locally. Process fix: the local commit script now runs the whole Playwright suite before every commit, not just unit tests.
 
+## 2026-11-13 T2.9 — Stranger test: empty, minimal, blocked storage, errors
+**Changed:** Safety net: if any screen throws, Forge shows "Something went wrong" (data is safe; Back up everything / Go to your
+answers / Reload; details for Claude) instead of a blank page — logged as a warning. Failed async work (a save, a file read) shows
+"Something didn’t save — please try again". Both stores now **probe storage when they start**, so blocked/full storage (private
+mode, quota) is flagged on the very first screen (before, the warning only appeared after the first failed save — found by the new
+test). Importing a spreadsheet shows "Reading your spreadsheet…". The onboarding walk helper moved into `tests/e2e/helpers.js`.
+Designed empty states already in place: Budget (import / start from scratch), Timeline + Scenarios ("a few answers missing"),
+"Events you’ve added" (explains what to add), what-ifs, investments ("No holdings yet").
+**Verified:** `tests/e2e/stranger.spec.js` (3): empty browser → Quick start answering only the 3 required questions → plan, all
+five tabs render with no overflow, no crash card, no console errors, a life event can be added; **storage blocked entirely** → boots,
+warns on the welcome screen and in Settings, works in memory across all tabs; a corrupt answer → safety-net card → "Go to your
+answers" works. `tests/store.test.js` (+1: probe). Screenshots `artifacts/stranger-minimal-plan.png`, `stranger-safety-net.png`.
+`npm run check` → 211/211; e2e 33/33.
+**Needs Harvey's eyes:** nothing specific — this is the "a stranger opens it" safety work.

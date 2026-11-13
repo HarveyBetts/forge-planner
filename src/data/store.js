@@ -50,7 +50,9 @@ export function createLocalStore(opts = {}) {
   const newId = opts.id || defaultId;
   const mem = {}; // key -> parsed value (cache + fallback)
 
-  const store = { persistent: !!backend };
+  let canWrite = false;
+  try { if (backend) { backend.setItem('forge.probe', '1'); backend.removeItem('forge.probe'); canWrite = true; } } catch { canWrite = false; }
+  const store = { persistent: canWrite };
 
   function read(key, fallback) {
     if (key in mem) return clone(mem[key]);
