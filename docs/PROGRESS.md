@@ -514,3 +514,19 @@ fresh device just pulls; **two devices against the mock** — A's events and bud
 nothing changed; **offline edits then reconnect** (error reported, then uploaded, then visible on B); concurrent edits → later wins and
 both converge; first sign-in asks and leaves local data untouched until chosen; signed-out does nothing. `npm run check` → 251/251.
 **Needs Harvey's eyes:** nothing yet (the Sync & account screen is T4.2).
+
+## 2026-11-13 T4.2 + T2.2f — Sync & account (against the mock until H3)
+**Changed:** Settings → **Sync & account**: with no Supabase project configured (today) an honest "Sync between devices — Not set up"
+row and a pointer to H3, no dead buttons. Once configured: **Sign in or create an account** sheet (email + password, readable errors,
+"check your email" for confirmation), signed-in view (email, **Sync now** with last-synced time or the error, **Sign out** and
+**Delete my account** — two taps — both keeping everything on the phone). Welcome screen gains "Already use Forge on another device?
+Sign in" so a new phone can pull its plan without answering the questions (gap found while writing the e2e). Syncs on open, on
+returning to the app, every 45 s while visible and when back online; pulled changes reload the app with "Updated from your other
+device"; edits on two devices → "kept the newest"; first sign-in on a phone with different data → **"Use my account’s copy / Use this
+phone’s copy"**. Email-confirmation links (#access_token=…) finish signing in (bug found by review: start-up used to rewrite that hash
+before it was read). CSP allows `https://*.supabase.co`. T2.2f: onboarding answers are the 'onboarding' document.
+**Verified:** `tests/e2e/sync.spec.js` (3) with two phones (separate browser contexts) and the mock Supabase behind a route:
+create account on A → answers + events uploaded; fresh phone B signs in from the welcome screen → plan and events arrive; B adds an
+event → A picks it up; delete account → cloud empty, A's data intact; a phone with different data is asked and "this phone's copy"
+wins; wrong password → "Invalid login credentials"; unconfigured app → "Not set up". `npm run check` → 251/251; e2e 48/48.
+**Needs Harvey's eyes:** only after H3 — create the account on your phone, then sign in on another device.

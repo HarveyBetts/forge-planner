@@ -31,6 +31,9 @@ import { checkinFields, valuesToQ49, makeSnapshot, trend, backupDue } from './ui
 import { realityCheck } from './budget/reality.js';
 import { parseCSV, detectColumns, toTransactions, merchantKey, applyTransactions } from './budget/csv.js';
 import { weekVsPlan, overPlan, setPlan, flagLevel } from './budget/plan.js';
+import { supabaseConfig } from './config.js';
+import { createSupabase } from './data/supabase.js';
+import { createSync } from './data/sync.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -165,6 +168,7 @@ function welcomeHTML() {
       </button>
     </div>
     <p class="note">Saved on this device as you go. Stop any time and pick up where you left off. Skip anything you don’t know.</p>
+    ${sbCfg ? '<button class="link-btn" data-act="acct-open">Already use Forge on another device? Sign in</button>' : ''}
     <button class="link-btn" data-act="paste-open">Paste answers from the intake doc</button>
     <label class="link-btn">Restore answers from a backup<input type="file" accept="application/json,.json" data-act="import" hidden></label>
     ${persistBanner()}
@@ -1245,6 +1249,7 @@ function settingsHTML() {
     </section>
     ${prefsHTML()}
     ${assumptionsHTML()}
+    ${accountHTML()}
     <section class="card list"><h2 class="list-h">Your data</h2>
       <button class="row" data-act="export"><span class="row-l">Back up everything</span><span class="row-v">answers, events, budget</span><span class="row-c" aria-hidden="true">›</span></button>
       <label class="row as-label"><span class="row-l">Restore from a backup</span><span class="row-c" aria-hidden="true">›</span><input type="file" accept="application/json,.json" data-act="import" hidden></label>
@@ -1372,6 +1377,86 @@ function adviceHTML() {
       <p>Before acting on a big decision — moving a pension or super, borrowing for training, buying a home — check the details with your provider, and consider speaking to a regulated financial adviser.</p>
       <a class="btn" href="#settings">Back to Settings</a></section>
   </div>`;
+}
+
+// ---------------- sync & account (T4.2 / T2.2f) — only when src/config.js has a Supabase project ----------------
+const sbCfg = supabaseConfig();
+const safeStorage = (() => { try { const ls = globalThis.localStorage; ls.getItem('x'); return ls; } catch { return null; } })();
+const sb = sbCfg && safeStorage ? createSupabase({ ...sbCfg, storage: safeStorage }) : null;
+const sync = sb ? createSync({ sb, storage: safeStorage }) : null;
+const ago = (t) => { if (!t) return 'never'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+async function runSync(opts = {}) {
+  if (!sync || !sb.signedIn()) return;
+  const r = await sync.syncNow(opts);
+  if (r.needsChoice) return openSyncChoice();
+  if (r.pulled && r.pulled.length) {
+    try { sessionStorage.setItem('forge.pulled', r.pulled.join(',')); } catch { /* fine */ }
+    location.reload(); // everything re-reads from the device
+    return;
+  }
+  if (r.conflicts && r.conflicts.length) toast(`Edited on two devices — kept the newest (${r.conflicts.map((c) => c.doc).join(', ')})`);
+  if (screen.name === 'settings') render('none', { keepScroll: true });
+  return r;
+}
+function openSyncChoice() {
+  openSheet({ label: 'Choose which copy to keep', html: `<div class="sh-top"><h2 class="h2">Two different copies</h2></div>
+    <p class="sub">This phone and your account both have Forge data, and they’re different. Which one should Forge keep? (Back up first if you’re unsure — Settings → Back up everything.)</p>
+    <div class="stack"><button class="btn primary" data-sync="remote">Use my account’s copy</button><button class="btn" data-sync="local">Use this phone’s copy</button></div>`,
+  onClick: async (e) => {
+    const b = e.target.closest('[data-sync]');
+    if (!b) return;
+    closeSheet();
+    await runSync({ prefer: b.dataset.sync });
+    toast(b.dataset.sync === 'local' ? 'This phone’s copy is now in your account' : 'Using your account’s copy');
+  } });
+}
+function accountHTML() {
+  if (!sbCfg) {
+    return `<section class="card list"><h2 class="list-h">Sync & account</h2>
+      <div class="row"><span class="row-l">Sync between devices</span><span class="row-v">Not set up</span></div>
+      <p class="list-note">Forge keeps everything on this phone. Syncing to other devices needs a free Supabase project — steps in the README (HUMAN_TODO H3).</p></section>`;
+  }
+  if (!sb || !sb.signedIn()) {
+    return `<section class="card list"><h2 class="list-h">Sync & account</h2>
+      <button class="row" data-act="acct-open"><span class="row-l">Sign in or create an account</span><span class="row-c" aria-hidden="true">›</span></button>
+      <p class="list-note">Keeps your plan, budget and check-ins on all your devices. Only you can read them.</p></section>`;
+  }
+  const st = sync.status;
+  return `<section class="card list"><h2 class="list-h">Sync & account</h2>
+    <div class="row"><span class="row-l">Signed in</span><span class="row-v" data-acct-email>${esc(sb.user() ? sb.user().email : '')}</span></div>
+    <button class="row" data-act="acct-sync"><span class="row-l">Sync now</span><span class="row-v" data-sync-status>${st.error ? `Couldn’t sync: ${esc(st.error)}` : `Last synced ${ago(st.lastSyncAt)}`}</span></button>
+    <button class="row" data-act="acct-signout"><span class="row-l">Sign out</span></button>
+    <button class="row danger" data-act="acct-delete"><span class="row-l">${screen.confirmAcctDelete ? 'Tap again — deletes your account and its cloud copy' : 'Delete my account'}</span></button>
+    <p class="list-note">Signing out or deleting the account keeps everything on this phone.</p></section>`;
+}
+function openAccount() {
+  openSheet({ label: 'Sign in', html: `<div class="sh-top"><h2 class="h2">Sync & account</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <p class="sub">Use the same email and password on each device.</p>
+    <form class="sh-form" data-acct novalidate>
+      <div class="field"><label for="ac-e">Email</label><input class="in" id="ac-e" name="email" type="email" autocomplete="email" autocapitalize="off"></div>
+      <div class="field"><label for="ac-p">Password</label><input class="in" id="ac-p" name="password" type="password" autocomplete="current-password" minlength="6"></div>
+    </form><p class="sh-err" role="alert" data-acct-err></p>
+    <div class="sh-actions"><button class="btn" data-ac="signup">Create account</button><button class="btn primary" data-ac="signin">Sign in</button></div>`,
+  onClick: async (e) => {
+    const b = e.target.closest('[data-ac]');
+    if (!b) return;
+    e.preventDefault();
+    const f = sheetBody().querySelector('[data-acct]').elements;
+    const err = sheetBody().querySelector('[data-acct-err]');
+    const email = f.email.value.trim(), password = f.password.value;
+    if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 6) { err.textContent = 'Enter your email and a password of at least 6 characters.'; return; }
+    b.disabled = true; err.textContent = '';
+    try {
+      if (b.dataset.ac === 'signup') {
+        const r = await sb.signUp(email, password);
+        if (r.needsConfirm) { err.textContent = 'Check your email for a confirmation link, then come back and sign in.'; b.disabled = false; return; }
+      } else await sb.signIn(email, password);
+      closeSheet();
+      toast('Signed in — syncing');
+      await runSync();
+      render('none', { keepScroll: true });
+    } catch (x) { err.textContent = x.message || 'Couldn’t sign in.'; b.disabled = false; }
+  } });
 }
 
 // Preferences come from your answers; each row reopens that question and Save returns here.
@@ -1519,6 +1604,16 @@ app.addEventListener('click', (e) => {
   if (act === 'crash-reload') { location.reload(); return; }
   if (act === 'crash-answers') { screen = { name: 'review' }; if (location.hash === '#answers') render('fwd'); else location.hash = '#answers'; return; }
   if (act === 'set-num') return openNumberSetting(val);
+  if (act === 'acct-open') return openAccount();
+  if (act === 'acct-sync') { runSync().then(() => toast(sync.status.error ? 'Couldn’t sync — will retry' : 'Synced')); return; }
+  if (act === 'acct-signout') { sb.signOut().then(() => { sync.forget(); render('none', { keepScroll: true }); toast('Signed out — your data is still on this phone'); }); return; }
+  if (act === 'acct-delete') {
+    if (!screen.confirmAcctDelete) { screen = { ...screen, confirmAcctDelete: true }; return render('none', { keepScroll: true }); }
+    screen = { ...screen, confirmAcctDelete: false };
+    sb.deleteAccount().then(() => { sync.forget(); render('none', { keepScroll: true }); toast('Account deleted — your data is still on this phone'); })
+      .catch((x) => toast(x.message || 'Couldn’t delete the account'));
+    return;
+  }
   if (act === 'wipe') {
     if (!screen.confirmWipe) { screen = { ...screen, confirmWipe: true }; return render('none', { keepScroll: true }); }
     data.clearAll().then(() => {
@@ -1568,17 +1663,36 @@ app.addEventListener('keydown', (e) => {
 if (state.completedAt) {
   const r = parseRoute(location.hash) || (planReady() ? 'plan' : 'answers');
   screen = { name: ROUTE_SCREEN[r] || r };
-  try { if (location.hash !== '#' + r) history.replaceState(null, '', '#' + r); } catch { /* ignore */ }
+  try { if (location.hash !== '#' + r && !/access_token=/.test(location.hash)) history.replaceState(null, '', '#' + r); } catch { /* ignore */ }
 } else {
   screen = { name: 'welcome' };
 }
+// Email-confirmation links arrive as #access_token=… — finish signing in, then carry on to Settings.
+const authRedirect = sb && /access_token=/.test(location.hash)
+  ? sb.fromRedirect(location.hash).then((ok) => { if (ok) { try { history.replaceState(null, '', '#settings'); } catch { /* ignore */ } } return ok; }).catch(() => false)
+  : Promise.resolve(false);
 // Load the life events you added (settings.events), then draw. LocalStore reads are synchronous under the
 // hood, so this resolves on the next microtask — no visible delay.
 Promise.all([
+  authRedirect,
   data.getSettings().then((st) => { appSettings = st || {}; userEvents = Array.isArray(st.events) ? st.events : []; }),
   data.getBudget().then((b) => { budget = b; }),
   data.listSnapshots().then((l) => { snapshots = l; }),
-]).catch(() => {}).finally(() => render('none'));
+]).catch(() => {}).finally(() => {
+  if (state.completedAt && /access_token=/.test(location.hash) === false && screen.name !== parseRoute(location.hash)) {
+    const r = parseRoute(location.hash); if (r) screen = { name: ROUTE_SCREEN[r] || r };
+  }
+  render('none');
+  let pulled = null;
+  try { pulled = sessionStorage.getItem('forge.pulled'); sessionStorage.removeItem('forge.pulled'); } catch { /* fine */ }
+  if (pulled) toast('Updated from your other device');
+  if (sync && sb.signedIn()) {
+    runSync();
+    setInterval(() => { if (document.visibilityState === 'visible') runSync(); }, 45000);
+    document.addEventListener('visibilitychange', () => runSync());
+    window.addEventListener('online', () => runSync());
+  }
+});
 // Offline app shell (T6.1): only over HTTPS (GitHub Pages), never on local test servers.
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('Offline mode unavailable:', e));
