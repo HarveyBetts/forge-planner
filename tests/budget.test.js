@@ -137,3 +137,37 @@ test('investments: lots roll up per ticker like the sheet (shares, cost, average
   near(totals.gain, (1800 + 320 + 150) - (1550 + 240 + 120)); // unpriced lot excluded from the gain
   assert.equal(totals.cost, 1550 + 240 + 120 + 5);
 });
+
+import { cashNow, netWorth, parseEntry, entryText, defaultWeek } from '../src/budget/view.js';
+
+test('view: cash today follows the forecast; net worth converts every part to the base currency', () => {
+  const b = sheetLike(); // opening A$1,000 from 2 Nov 2026, pay 2 weeks late
+  assert.equal(cashNow(b, '2026-10-01'), 1000);
+  assert.equal(cashNow(b, '2026-11-04'), 1000 - 400 - 100);   // week 1 started; pay not landed yet
+  b.extras = [{ id: 'pb', name: 'Premium Bonds', currency: 'GBP', amount: 500 }];
+  b.holdings = { lots: [{ ticker: 'VUSA', shares: 10, price: 100, currency: 'GBP', costGBP: 1000 }], prices: { VUSA: { price: 110, currency: 'GBP' } } };
+  const convert = (a, f, t) => (f === 'AUD' && t === 'GBP' ? a * 0.5 : f === t ? a : NaN);
+  const nw = netWorth(b, { convert, base: 'GBP', today: '2026-11-04' });
+  assert.deepEqual(nw.parts.map((p) => [p.id, p.inBase]), [['cash', 250], ['pb', 500], ['investments', 1100]]);
+  assert.equal(nw.total, 1850);
+});
+
+test('view: typed amounts → signed entries (spend positive, refunds with +) and back', () => {
+  assert.equal(parseEntry('120', 'expense'), -120);
+  assert.equal(parseEntry('A$1,200.50', 'expense'), -1200.5);
+  assert.equal(parseEntry('+35', 'expense'), 35);
+  assert.equal(parseEntry('900', 'income'), 900);
+  assert.equal(parseEntry('-50', 'income'), -50);
+  assert.equal(parseEntry('', 'expense'), null);
+  assert.equal(parseEntry('0', 'income'), null);
+  assert.equal(parseEntry('abc', 'expense'), undefined);
+  for (const [v, k] of [[-120, 'expense'], [35, 'expense'], [900, 'income'], [-50, 'income']]) assert.equal(parseEntry(entryText(v, k), k), v);
+  assert.equal(entryText(null, 'expense'), '');
+});
+
+test('view: default week is this week if covered, else the nearest week with data', () => {
+  const b = sheetLike();
+  assert.equal(defaultWeek(b, '2026-11-11'), '2026-11-09');
+  assert.equal(defaultWeek(b, '2026-01-01'), '2026-11-02');
+  assert.equal(defaultWeek(b, '2030-01-01'), Object.keys(b.entries).sort().pop());
+});

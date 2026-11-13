@@ -308,3 +308,23 @@ categories, 7 bills, pay lag, Premium Bonds, 10 purchases / 5 holdings all price
 sheet's own cached values to the cent, and total cost matches exactly. `npm run check` → 201/201.
 **Needs Harvey's eyes:** nothing yet — the import screen comes with T3.7.
 
+## 2026-11-13 T3.6 + T3.7 — Import screen and the Budget tab
+**Changed:** Budget tab (`src/app.js` + `src/budget/view.js`): empty state with **Import my spreadsheet** (.xlsx, read on the
+phone) or **Start from scratch**; **Check your import** (weeks / categories / holdings, what came across, warnings, "replaces the
+budget on this phone") → Save or Cancel — nothing stored before Save. **Money**: net worth today in the base currency (cash in A$,
+Premium Bonds, investments; live FX badge), the week with always-editable cells (type what you spent; "+" for money back; Return
+commits; totals, forecast and net worth update in place without a redraw), week ‹ ›, **cash by fortnight** with the pay lag,
+lowest point highlighted and a warning if it goes below zero, **bills coming up**. **Investments**: total value / cost / gain,
+holdings with average cost and gain %, tap to update a price, add a purchase. **Use these as my current balances** → previews
+the plan change → writes q49 (cash A$, Premium Bonds as £ cash, investments as Stocks ISA; super untouched). Remove budget (two
+taps). Store gains `getBudget/saveBudget/removeBudget`; budgets ride along in full backups (validated). `docs/BUDGET.md`;
+HUMAN_TODO H9 (how to import from Google Sheets).
+**Verified:** `tests/budget.test.js` (+3: cash today, net worth across currencies, typed-amount sign rules, default week);
+`tests/store.test.js` (+1: budget save/backup/damaged). `tests/e2e/budget.spec.js` (2): import → preview (storage still empty)
+→ cancel (still empty) → import → save; exact net worth at fixed rates and date; week values; edit food and a "+15" refund → totals
+and forecast update, persisted after reload; week navigation; bills ("tomorrow"); investments total, price update; use balances →
+q49 written with super untouched. Non-xlsx file → readable error; start from scratch; remove. Screenshots
+`artifacts/budget-import-check.png`, `budget-money.png`, `budget-investments.png`. `npm run check` → 206/206; e2e 27/27.
+**Needs Harvey's eyes:** import your real sheet (H9) and check the numbers against Google Sheets. Typing amounts into the
+week rows on the phone.
+

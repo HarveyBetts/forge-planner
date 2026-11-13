@@ -7,7 +7,7 @@ export function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
 }
 
-const SYM = { GBP: '£', AUD: 'A$' };
+const SYM = { GBP: '£', AUD: 'A$', USD: 'US$', EUR: '€' };
 export function money(amount, currency = 'GBP', { compact = false } = {}) {
   const n = Number(amount) || 0;
   const sym = SYM[currency] || '';

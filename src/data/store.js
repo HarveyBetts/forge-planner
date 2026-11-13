@@ -10,6 +10,7 @@
 //   saveSnapshot(snapshot)     -> saved snapshot (one per month: same `at` replaces)
 //   getSettings()              -> settings object ({} when none)
 //   saveSettings(patch)        -> merged settings
+//   getBudget() / saveBudget(b) -> the budget model (src/budget/ledger.js) or null
 //   exportAll()                -> JSON string (a full backup, incl. onboarding answers)
 //   importAll(json)            -> { scenarios, snapshots, settings, onboarding } counts; replaces everything
 //   clearAll()                 -> wipes everything this app stores
@@ -23,6 +24,7 @@ export const KEYS = {
   scenarios: 'forge.scenarios.v1',
   snapshots: 'forge.snapshots.v1',
   settings: 'forge.settings.v1',
+  budget: 'forge.budget.v1',       // weekly ledger + investments (src/budget) — kept on this device, in backups
   onboarding: 'forge.onboarding.v1', // owned by src/onboarding/state.js; included in backups
 };
 export const BACKUP_KIND = 'full-backup';
@@ -122,6 +124,16 @@ export function createLocalStore(opts = {}) {
       write(KEYS.settings, merged);
       return clone(merged);
     },
+    async getBudget() {
+      const b = read(KEYS.budget, null);
+      return isObj(b) && b.v === 1 ? b : null;
+    },
+    async saveBudget(b) {
+      if (!isObj(b) || b.v !== 1) throw new TypeError('saveBudget needs a v1 budget');
+      write(KEYS.budget, b);
+      return clone(b);
+    },
+    async removeBudget() { remove(KEYS.budget); },
     async exportAll() {
       const onboarding = read(KEYS.onboarding, null);
       return JSON.stringify({
@@ -129,6 +141,7 @@ export function createLocalStore(opts = {}) {
         scenarios: Object.values(scenarios()).filter(isObj),
         snapshots: snapshots(),
         settings: settings(),
+        budget: (() => { const b = read(KEYS.budget, null); return isObj(b) ? b : null; })(),
         onboarding: isObj(onboarding) ? onboarding : null,
       }, null, 2);
     },
@@ -140,9 +153,10 @@ export function createLocalStore(opts = {}) {
       write(KEYS.snapshots, data.snapshots);
       write(KEYS.settings, data.settings);
       if (data.onboarding) write(KEYS.onboarding, data.onboarding); else remove(KEYS.onboarding);
+      if (data.budget) write(KEYS.budget, data.budget); else remove(KEYS.budget);
       return {
         scenarios: data.scenarios.length, snapshots: data.snapshots.length,
-        settings: Object.keys(data.settings).length, onboarding: !!data.onboarding,
+        settings: Object.keys(data.settings).length, onboarding: !!data.onboarding, budget: !!data.budget,
       };
     },
     async clearAll() {
@@ -173,7 +187,13 @@ export function parseBackup(text) {
   });
   const settings = isObj(data.settings) ? data.settings : {};
   const onboarding = isObj(data.onboarding) && isObj(data.onboarding.answers) ? data.onboarding : null;
-  return { scenarios, snapshots, settings, onboarding };
+  let budget = null;
+  if (data.budget != null) {
+    const b = data.budget;
+    if (!isObj(b) || b.v !== 1 || !Array.isArray(b.categories) || !isObj(b.entries)) throw new Error('The budget in that backup is damaged.');
+    budget = b;
+  }
+  return { scenarios, snapshots, settings, onboarding, budget };
 }
 
 // In-memory Storage double for tests and for "storage unavailable" fallback scenarios.

@@ -40,8 +40,8 @@ Phases 0–3 need nothing from Harvey except a GitHub repo to push to. Everythin
 Harvey's own spreadsheet (budget + investments) defines this phase — see D23. Spreadsheet tasks first:
 - [x] **T3.2** Budget v1 = Harvey's weekly ledger: categories (signed amounts, money in +, out −), week totals, running cash balance by fortnight with pay landing N weeks late (his sheet: 2), bills with due days. Pure + tests that reproduce his sheet's formulas on made-up numbers.
 - [x] **T3.5** Investments: purchase lots → holdings (shares, total/avg cost £, avg buy price, currency incl. GBX, price, value £, gain £/%), totals; prices from the import or typed in. Accept: tests incl. GBX and USD lots.
-- [ ] **T3.6** Import his .xlsx on-device (zip + XML read in the browser, no libraries; mapped by headings, not cell positions) → preview → confirm. Accept: tests on a synthetic workbook with the same layout; nothing saved before confirm; no personal data in git.
-- [ ] **T3.7** Budget tab UI (week view with inline edits, cash forecast, bills, investments, net worth in base currency) + "Use these as my current balances" → updates the plan's pots after confirmation. Accept: e2e import → screens → use in plan.
+- [x] **T3.6** Import his .xlsx on-device (zip + XML read in the browser, no libraries; mapped by headings, not cell positions) → preview → confirm. Accept: tests on a synthetic workbook with the same layout; nothing saved before confirm; no personal data in git.
+- [x] **T3.7** Budget tab UI (week view with inline edits, cash forecast, bills, investments, net worth in base currency) + "Use these as my current balances" → updates the plan's pots after confirmation. Accept: e2e import → screens → use in plan.
 - [ ] **T3.1** Monthly check-in: enter actual pot values → snapshot → compare to glide path. Accept: on-track/behind updates.
 - [ ] **T3.2b** (was T3.2) Planned vs actual per category and "freed-up money" linked to the engine's `freed` value.
 - [ ] **T3.3** CSV import (column mapping, dedupe, preview before commit). Accept: sample CSV fixtures for 2 bank formats; malformed rows reported, not crashed.

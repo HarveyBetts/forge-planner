@@ -22,6 +22,10 @@ import { createLocalStore } from './data/store.js';
 import { expandEvents } from './engine/events.js';
 import { FORMS, EDITABLE, formToEvent, eventToForm, eventLabel, eventWhen, newEventId } from './ui/eventforms.js';
 import { openSheet, closeSheet, setSheetHTML, sheetBody, toast } from './ui/sheet.js';
+import { readXlsx } from './budget/xlsx.js';
+import { workbookToBudget } from './budget/importsheet.js';
+import { emptyBudget, STARTER_CATEGORIES, weekRow, setEntry, addWeeks, weekLabel, forecastBy, upcomingBills, mondayOf } from './budget/ledger.js';
+import { cashNow, netWorth, parseEntry, entryText, defaultWeek } from './budget/view.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -683,13 +687,200 @@ function sheetClick(e) {
   }
 }
 
-// ---------------- budget (Phase 3) ----------------
+// ---------------- budget (Phase 3 — Harvey's spreadsheet, D23) ----------------
+let budget = null;        // loaded at boot from the store (this device only)
+let budWeek = null;       // Monday of the week on screen
+let budSeg = 'money';     // 'money' | 'invest'
+let budPreview = null;    // { budget, report, fileName } — an import waiting for "Save"; nothing stored until then
+const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const bm = (x, c, compact = false) => money(x, c || (budget && budget.currency) || base(), { compact });
+const SHORT = (iso) => { const [y, m, d] = iso.split('-').map(Number); return `${d} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]}${y !== new Date().getFullYear() ? ' ' + String(y).slice(2) : ''}`; };
+async function saveBudget(next) { budget = next; await data.saveBudget(next); }
+
 function budgetHTML() {
+  if (budPreview) return budPreviewHTML();
+  if (!budget) return budEmptyHTML();
+  budWeek = budWeek || defaultWeek(budget, isoToday());
+  const seg = `<div class="seg" role="tablist"><button role="tab" aria-selected="${budSeg === 'money'}" data-act="bud-seg" data-val="money">Money</button><button role="tab" aria-selected="${budSeg === 'invest'}" data-act="bud-seg" data-val="invest">Investments</button></div>`;
+  return `<header class="bar"><h1 class="h2">Budget</h1></header><div class="wrap">${seg}
+    ${budSeg === 'invest' ? investHTML() : `
+    <section class="card nw" data-bud-nw>${netWorthHTML()}</section>
+    <section class="card wk">${weekHTML()}</section>
+    <section class="card" data-bud-forecast>${forecastHTML()}</section>
+    ${billsHTML()}`}
+    <button class="link-btn danger-link" data-act="bud-remove">${screen.confirmBudRemove ? 'Tap again to remove the budget from this phone' : 'Remove budget from this phone'}</button>
+  </div>`;
+}
+function budEmptyHTML() {
   return `<header class="bar"><h1 class="h2">Budget</h1></header><div class="wrap">
     <section class="card empty"><span class="empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="13" rx="3"/><path d="M3.5 10h17M15.5 14.5h2"/></svg></span>
-    <h2 class="h3">Budgeting is next on the list</h2>
-    <p class="sub">Categories, planned vs actual, and importing a CSV from your bank (no bank logins, ever). It will show how much coasting frees up each month.</p></section>
+      <h2 class="h3">Bring in your budget</h2>
+      <p class="sub">Import your spreadsheet (.xlsx): weeks, categories, bills, Premium Bonds and investments come across. It’s read on this phone and stays here.</p>
+      <label class="btn primary as-label">Import my spreadsheet<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-act="bud-import" hidden></label>
+      <button class="btn" data-act="bud-scratch">Start from scratch</button>
+      <p class="err" role="alert" data-err></p></section></div>`;
+}
+function budPreviewHTML() {
+  const { budget: b, report, fileName } = budPreview;
+  const hc = new Set((b.holdings.lots || []).map((l) => l.ticker)).size;
+  return `<header class="bar"><h1 class="h2">Check your import</h1></header><div class="wrap">
+    <p class="sub">From <b>${esc(fileName)}</b>. Nothing is saved until you tap Save.</p>
+    <div class="card stats"><div><span class="stat-n">${Object.keys(b.entries).length}</span><span class="stat-l">weeks</span></div>
+      <div><span class="stat-n">${b.categories.length}</span><span class="stat-l">categories</span></div>
+      <div><span class="stat-n">${hc}</span><span class="stat-l">holdings</span></div></div>
+    ${report.warnings.map((w) => `<p class="banner warn" role="status">${esc(w)}</p>`).join('')}
+    <section class="card"><h2 class="rv-h">What came across</h2><ul class="bul">${report.lines.map((l) => `<li>${esc(l)}</li>`).join('')}
+      <li>Cash now: ${bm(b.openingCash, b.currency)}</li>${b.extras.map((e) => `<li>${esc(e.name)}: ${bm(e.amount, e.currency)}</li>`).join('')}</ul>
+      <div class="chips">${b.categories.map((c) => `<span class="chip-s${c.kind === 'income' ? ' in' : ''}">${esc(c.name)}</span>`).join('')}</div></section>
+    ${budget ? '<p class="banner warn">This replaces the budget already on this phone.</p>' : ''}
+    <div class="stack"><button class="btn primary" data-act="bud-import-save">Save to my budget</button><button class="btn" data-act="bud-import-cancel">Cancel</button></div>
   </div>`;
+}
+function netWorthHTML() {
+  const nw = netWorth(budget, { convert: (a, f, t) => fx.convert(a, f, t), base: base(), today: isoToday() });
+  return `<span class="lab">Net worth today</span><span class="big">${money(nw.total, base())}</span>
+    <ul class="nw-parts">${nw.parts.map((p) => `<li><span>${esc(p.label)}</span><span class="nw-a">${p.currency !== base() ? `<small>${bm(p.amount, p.currency)}</small> ` : ''}${money(p.inBase, base())}</span></li>`).join('')}</ul>
+    ${nw.holdings.totals.unpriced.length ? `<p class="mini">No price yet for ${esc(nw.holdings.totals.unpriced.join(', '))}.</p>` : ''}
+    <button class="btn small" data-act="bud-use">Use these as my current balances</button>
+    <p class="mini">Other currencies at mid-market rates (${esc(fxBadge(fx))}).</p>`;
+}
+function weekSumHTML() {
+  const r = weekRow(budget, budWeek);
+  return `<span>In <b>${bm(r.income + r.otherIn)}</b></span><span>Out <b>${bm(r.spent)}</b></span><span class="${r.total < 0 ? 'neg' : 'pos'}">Left <b>${bm(r.total)}</b></span>`;
+}
+function weekHTML() {
+  const row = budget.entries[budWeek] || {};
+  return `<div class="wk-nav"><button class="icon-btn" data-act="bud-week" data-val="-1" aria-label="Previous week"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <span class="wk-l">${weekLabel(budWeek)}${budWeek === mondayOf(isoToday()) ? ' · this week' : ''}</span>
+      <button class="icon-btn" data-act="bud-week" data-val="1" aria-label="Next week"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
+    <div class="wk-sum" data-bud-sum>${weekSumHTML()}</div>
+    <ul class="wk-list">${budget.categories.map((c) => `<li class="${c.kind === 'income' ? 'is-in' : ''}"><label for="be-${esc(c.id)}">${esc(c.name)}</label>
+      <input class="in be" id="be-${esc(c.id)}" data-cat="${esc(c.id)}" data-kind="${c.kind}" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(entryText(row[c.id], c.kind))}"></li>`).join('')}</ul>
+    <p class="mini">Type what you spent. Money back into a spending category? Start it with +.</p>`;
+}
+function forecastHTML() {
+  const f = forecastBy(budget, 2);
+  if (!f.length) return '<h2 class="rv-h">Cash by fortnight</h2><p class="mini">Add a week to see where your cash is heading.</p>';
+  const lo = Math.min(0, ...f.map((r) => r.balance)), hi = Math.max(...f.map((r) => r.balance), 1);
+  const minRow = f.reduce((a, r) => (r.balance < a.balance ? r : a), f[0]);
+  return `<h2 class="rv-h">Cash by fortnight</h2>
+    ${budget.payLagWeeks ? `<p class="mini">Pay lands ${budget.payLagWeeks} weeks after it’s earned, like your spreadsheet.</p>` : ''}
+    ${minRow.balance < 0 ? `<p class="callout warn">Cash dips below zero around ${SHORT(minRow.end)} (${bm(minRow.balance)}).</p>` : ''}
+    <ul class="fc">${f.map((r) => `<li class="${r === minRow ? 'low' : ''}"><span class="fc-d">${SHORT(r.end)}</span>
+      <span class="fc-bar"><i style="width:${(((r.balance - lo) / (hi - lo)) * 100).toFixed(1)}%"></i></span>
+      <span class="fc-b">${bm(r.balance, null, true)}</span><span class="fc-c ${r.change < 0 ? 'neg' : 'pos'}">${r.change >= 0 ? '+' : ''}${bm(r.change, null, true)}</span></li>`).join('')}</ul>`;
+}
+function billsHTML() {
+  const up = upcomingBills(budget.bills, isoToday()).slice(0, 6);
+  if (!up.length) return '';
+  return `<section class="card"><h2 class="rv-h">Bills coming up</h2><ul class="bills">${up.map((b) => `<li><span class="bl-n">${esc(b.name)}</span><span class="bl-d">${SHORT(b.due)}</span><span class="bl-in ${b.inDays <= 3 ? 'soon' : ''}">${b.inDays === 0 ? 'today' : b.inDays === 1 ? 'tomorrow' : `in ${b.inDays} days`}</span></li>`).join('')}</ul></section>`;
+}
+function investHTML() {
+  const nw = netWorth(budget, { convert: (a, f, t) => fx.convert(a, f, t), base: base(), today: isoToday() });
+  const { list, totals } = nw.holdings;
+  const gp = (x) => (x == null ? '' : `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`);
+  const srcAt = Object.values(budget.holdings.prices || {}).map((p) => p.at).filter(Boolean).sort().pop();
+  return `<section class="card inv-tot"><span class="lab">Investments</span><span class="big">${money(totals.value, 'GBP')}</span>
+      <div class="wk-sum"><span>Cost <b>${money(totals.cost, 'GBP')}</b></span><span class="${totals.gain < 0 ? 'neg' : 'pos'}">Gain <b>${money(totals.gain, 'GBP')} ${gp(totals.gainPct)}</b></span></div>
+      <p class="mini">${srcAt ? `Prices as of ${SHORT(srcAt)}` : 'No prices yet'} — tap a holding to update its price. US$/€ holdings use live exchange rates.</p></section>
+    ${list.length ? `<section class="card list">${list.map((h) => `<button class="row inv" data-act="bud-price" data-val="${esc(h.ticker)}">
+      <span class="row-l"><b>${esc(h.ticker)}</b>${h.name ? `<small>${esc(h.name)}</small>` : ''}<small>${+h.shares.toFixed(4)} shares · avg ${money(h.avgCost, 'GBP')}</small></span>
+      <span class="inv-v">${h.value == null ? '<small>needs a price</small>' : money(h.value, 'GBP')}<small class="${(h.gain || 0) < 0 ? 'neg' : 'pos'}">${gp(h.gainPct)}</small></span></button>`).join('')}</section>`
+      : '<section class="card"><p class="mini">No holdings yet.</p></section>'}
+    <button class="btn" data-act="bud-addlot">Add a purchase</button>`;
+}
+// In-place refresh after a cell edit: keeps focus and scroll (no full re-render).
+function budRefreshParts() {
+  const set = (sel, html) => { const el = app.querySelector(sel); if (el) el.innerHTML = html; };
+  set('[data-bud-sum]', weekSumHTML());
+  set('[data-bud-forecast]', forecastHTML());
+  set('[data-bud-nw]', netWorthHTML());
+}
+async function budCellChange(input) {
+  const v = parseEntry(input.value, input.dataset.kind);
+  if (v === undefined) { input.value = entryText((budget.entries[budWeek] || {})[input.dataset.cat], input.dataset.kind); return; }
+  await saveBudget(setEntry(budget, budWeek, input.dataset.cat, v));
+  input.value = entryText(v, input.dataset.kind);
+  budRefreshParts();
+}
+async function budImportFile(file) {
+  const err = (m) => { const el = app.querySelector('[data-err]'); if (el) el.textContent = m; };
+  try {
+    const wb = await readXlsx(await file.arrayBuffer());
+    const out = workbookToBudget(wb, { today: isoToday(), base: base() });
+    budPreview = { ...out, fileName: file.name };
+    render('fwd');
+  } catch (e) { err(e.message || 'Couldn’t read that file.'); }
+}
+// "Use these as my current balances": cash, Premium Bonds and investments → the plan's opening pots (q49), after a preview.
+function balancesFromBudget() {
+  const nw = netWorth(budget, { convert: (a, f, t) => fx.convert(a, f, t), base: base(), today: isoToday() });
+  const q49 = { ...((state.answers.q49 && state.answers.q49.v) || {}) };
+  const cash = nw.parts.find((p) => p.id === 'cash');
+  if (cash) q49[cash.currency === 'AUD' ? 'cashAUD' : 'cashGBP'] = { amount: Math.round(cash.amount), currency: cash.currency === 'AUD' ? 'AUD' : 'GBP' };
+  const gbpExtras = nw.parts.filter((p) => !['cash', 'investments'].includes(p.id)).reduce((s, p) => s + (p.currency === 'GBP' ? p.amount : fx.convert(p.amount, p.currency, 'GBP')), 0);
+  if (gbpExtras) q49.cashGBP = { amount: Math.round(gbpExtras + (cash && cash.currency === 'GBP' ? cash.amount : 0)), currency: 'GBP' };
+  const inv = nw.parts.find((p) => p.id === 'investments');
+  if (inv) q49.isa = { amount: Math.round(inv.amount), currency: 'GBP' };
+  return q49;
+}
+function openUseBalances() {
+  const q49 = balancesFromBudget();
+  const before = planSnap();
+  const saved = state.answers;
+  state = { ...state, answers: { ...state.answers, q49: { v: q49 } } };
+  const after = planSnap();
+  state = { ...state, answers: saved };
+  const lines = diffSnapshots(before, after, { currency: base() });
+  const row = (k, label) => (q49[k] ? `<li>${label}: <b>${money(q49[k].amount, q49[k].currency)}</b></li>` : '');
+  openSheet({ label: 'Use as current balances', html: `<div class="sh-top"><h2 class="h2">Update your plan</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <p class="sub">Your plan’s starting balances (question 49) become:</p>
+    <ul class="bul">${row('cashAUD', 'Cash (A$)')}${row('cashGBP', 'Cash (£) incl. Premium Bonds')}${row('isa', 'Stocks ISA (your investments)')}${row('super', 'Australian super (unchanged)')}${row('other', 'Anything else (unchanged)')}</ul>
+    <div class="sh-preview">${lines.length ? `<span class="lab">What this does to your plan</span><ul class="bul">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : '<span class="mini">Your headline numbers don’t move.</span>'}</div>
+    <div class="sh-actions single"><button class="btn primary" data-bud="use-confirm">Update my plan</button></div>`,
+  onClick: (e) => {
+    if (!e.target.closest('[data-bud="use-confirm"]')) return;
+    state = store.save({ ...state, answers: { ...state.answers, q49: { v: balancesFromBudget() } } });
+    closeSheet();
+    toast(`Plan updated${lines.length ? ' — ' + lines[0] : ''}`);
+  } });
+}
+function openPriceSheet(ticker) {
+  const h = netWorth(budget, { convert: (a, f, t) => fx.convert(a, f, t), base: base(), today: isoToday() }).holdings.list.find((x) => x.ticker === ticker);
+  if (!h) return;
+  const cur = h.currency || 'GBP';
+  openSheet({ label: `Price for ${ticker}`, html: `<div class="sh-top"><h2 class="h2">${esc(ticker)}</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    ${h.name ? `<p class="sub">${esc(h.name)}</p>` : ''}
+    <div class="field"><label for="pp">Current price (${esc(cur === 'GBX' ? 'pence' : cur)})</label><input class="in" id="pp" inputmode="decimal" value="${h.price ?? ''}" autocomplete="off"></div>
+    <p class="mini">${+h.shares.toFixed(4)} shares · cost ${money(h.cost, 'GBP')}</p>
+    <div class="sh-actions single"><button class="btn primary" data-bud="price-save">Save price</button></div>`,
+  onClick: async (e) => {
+    if (!e.target.closest('[data-bud="price-save"]')) return;
+    const v = Number(String(sheetBody().querySelector('#pp').value).replace(/[^0-9.]/g, ''));
+    if (!(v > 0)) return;
+    await saveBudget({ ...budget, holdings: { ...budget.holdings, prices: { ...budget.holdings.prices, [ticker]: { ...(budget.holdings.prices[ticker] || {}), price: v, currency: cur, at: isoToday(), source: 'you' } } } });
+    closeSheet(); render('none', { keepScroll: true }); toast(`${ticker} price saved`);
+  } });
+}
+function openAddLot() {
+  openSheet({ label: 'Add a purchase', html: `<div class="sh-top"><h2 class="h2">Add a purchase</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <form class="sh-form" data-lot>
+      <div class="field"><label for="lt">Ticker</label><input class="in" id="lt" name="ticker" autocapitalize="characters" autocomplete="off" placeholder="e.g. VUSA"></div>
+      <div class="field"><label for="ls">Shares</label><input class="in" id="ls" name="shares" inputmode="decimal" autocomplete="off"></div>
+      <div class="field"><label for="lp">Price per share</label><input class="in" id="lp" name="price" inputmode="decimal" autocomplete="off"></div>
+      <div class="field"><label for="lc">Price currency</label><select class="in" id="lc" name="currency"><option value="GBP">£ GBP</option><option value="GBX">pence (GBX)</option><option value="USD">US$</option><option value="EUR">€</option></select></div>
+      <div class="field"><label for="lg">What it cost you in £</label><input class="in" id="lg" name="cost" inputmode="decimal" autocomplete="off"></div>
+    </form><p class="sh-err" role="alert" data-lot-err></p>
+    <div class="sh-actions single"><button class="btn primary" data-bud="lot-save">Add</button></div>`,
+  onClick: async (e) => {
+    if (!e.target.closest('[data-bud="lot-save"]')) return;
+    const f = sheetBody().querySelector('[data-lot]').elements;
+    const n = (k) => Number(String(f[k].value).replace(/[^0-9.]/g, ''));
+    const lot = { ticker: f.ticker.value.trim().toUpperCase(), shares: n('shares'), price: n('price'), currency: f.currency.value, costGBP: n('cost') };
+    if (!lot.ticker || !(lot.shares > 0) || !(lot.costGBP > 0)) { sheetBody().querySelector('[data-lot-err]').textContent = 'Enter the ticker, the number of shares and what it cost in £.'; return; }
+    await saveBudget({ ...budget, holdings: { ...budget.holdings, lots: [...budget.holdings.lots, lot] } });
+    closeSheet(); render('none', { keepScroll: true }); toast(`Added ${lot.ticker}`);
+  } });
 }
 
 // ---------------- scenarios (T2.7 adds duplicate + compare) ----------------
@@ -821,6 +1012,21 @@ app.addEventListener('click', (e) => {
     const p = prevQuestion(state.answers, state.mode, screen.id);
     return p ? go({ name: 'question', id: p.id }, 'back') : go({ name: 'welcome' }, 'back');
   }
+  if (act === 'bud-seg') { budSeg = val; return render('none', { keepScroll: true }); }
+  if (act === 'bud-week') { budWeek = addWeeks(budWeek, Number(val)); return render('none', { keepScroll: true }); }
+  if (act === 'bud-scratch') { saveBudget({ ...emptyBudget(base()), categories: STARTER_CATEGORIES, openingAt: defaultWeek({ entries: {} }, isoToday()) }).then(() => render('fwd')); return; }
+  if (act === 'bud-import-cancel') { budPreview = null; return render('back'); }
+  if (act === 'bud-import-save') { const b = budPreview.budget; budPreview = null; budWeek = null; saveBudget(b).then(() => { render('fwd'); toast('Budget imported'); }); return; }
+  if (act === 'bud-use') return openUseBalances();
+  if (act === 'bud-price') return openPriceSheet(val);
+  if (act === 'bud-addlot') return openAddLot();
+  if (act === 'bud-remove') {
+    if (!screen.confirmBudRemove) { screen = { ...screen, confirmBudRemove: true }; return render('none', { keepScroll: true }); }
+    screen = { ...screen, confirmBudRemove: false };
+    budget = null; budWeek = null;
+    data.removeBudget().catch(() => {});
+    return render('back');
+  }
   if (act === 'ev-add') return openEventEditor(null);
   if (act === 'ev-edit') return openEventEditor(val);
   if (act === 'tl-step') {
@@ -856,6 +1062,8 @@ app.addEventListener('click', (e) => {
 
 app.addEventListener('change', (e) => {
   const input = e.target;
+  if (input.matches('.be')) { budCellChange(input); return; }
+  if (input.matches('[data-act="bud-import"]') && input.files && input.files[0]) { budImportFile(input.files[0]); input.value = ''; return; }
   if (!input.matches('[data-act="import"]') || !input.files || !input.files[0]) return;
   input.files[0].text().then((text) => {
     const answers = importAnswers(text, KNOWN_IDS);
@@ -865,6 +1073,7 @@ app.addEventListener('change', (e) => {
 });
 
 app.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.matches && e.target.matches('.be')) { e.preventDefault(); e.target.blur(); return; }
   if (e.key !== 'Enter' || screen.name !== 'question') return;
   if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
   e.preventDefault();
@@ -881,7 +1090,10 @@ if (state.completedAt) {
 }
 // Load the life events you added (settings.events), then draw. LocalStore reads are synchronous under the
 // hood, so this resolves on the next microtask — no visible delay.
-data.getSettings().then((st) => { userEvents = Array.isArray(st.events) ? st.events : []; }).catch(() => {}).finally(() => render('none'));
+Promise.all([
+  data.getSettings().then((st) => { userEvents = Array.isArray(st.events) ? st.events : []; }),
+  data.getBudget().then((b) => { budget = b; }),
+]).catch(() => {}).finally(() => render('none'));
 // Live FX in the background; if the plan is on screen and rates changed, refresh it in place.
 {
   const before = JSON.stringify(fx.rates());

@@ -121,7 +121,7 @@ test('store: export → clear → import restores everything (incl. onboarding a
   assert.equal(mem.size, 0);
   assert.deepEqual(await s.listScenarios(), []);
   const counts = await s.importAll(backup);
-  assert.deepEqual(counts, { scenarios: 1, snapshots: 1, settings: 1, onboarding: true });
+  assert.deepEqual(counts, { scenarios: 1, snapshots: 1, settings: 1, onboarding: true, budget: false });
   assert.equal((await s.getScenario(a.id)).retirementAge, 55);
   assert.equal((await s.listSnapshots())[0].total, 1000);
   assert.deepEqual(await s.getSettings(), { base: 'AUD' });
@@ -144,5 +144,21 @@ test('store: bad backups are rejected with readable errors and nothing is writte
 
 test('parseBackup: tolerates missing optional sections', () => {
   const d = parseBackup(JSON.stringify({ app: 'forge', kind: 'full-backup', v: 1 }));
-  assert.deepEqual(d, { scenarios: [], snapshots: [], settings: {}, onboarding: null });
+  assert.deepEqual(d, { scenarios: [], snapshots: [], settings: {}, onboarding: null, budget: null });
+});
+
+test('store: budget save/get and it rides along in backups; damaged budget rejected', async () => {
+  const s = mk();
+  assert.equal(await s.getBudget(), null);
+  await assert.rejects(() => s.saveBudget({ v: 2 }), /v1 budget/);
+  const b = { v: 1, currency: 'AUD', categories: [{ id: 'income', name: 'Income', kind: 'income' }], entries: { '2026-11-02': { income: 1 } } };
+  await s.saveBudget(b);
+  assert.deepEqual(await s.getBudget(), b);
+  const backup = await s.exportAll();
+  await s.clearAll();
+  assert.equal(await s.getBudget(), null);
+  const counts = await s.importAll(backup);
+  assert.equal(counts.budget, true);
+  assert.deepEqual(await s.getBudget(), b);
+  await assert.rejects(() => s.importAll(JSON.stringify({ app: 'forge', kind: 'full-backup', v: 1, budget: { v: 1 } })), /budget in that backup is damaged/);
 });

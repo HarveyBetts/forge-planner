@@ -32,6 +32,12 @@ come from you or the official offer paperwork — Claude Code is forbidden from 
 After each phase, open the app on your phone (add to Home Screen) and send a numbered punch list.
 
 ---
+## H9 — Bring your spreadsheet into Forge (2 min, on your iPhone)
+1. Google Sheets → your finances sheet → File → Download → Microsoft Excel (.xlsx). Save it to Files.
+2. Forge → Budget tab → **Import my spreadsheet** → pick that file → check the summary → **Save to my budget**.
+3. Optional: **Use these as my current balances** to feed cash, Premium Bonds and investments into your plan.
+Re-import any time you've updated the sheet (it replaces what's on the phone). Details: docs/BUDGET.md.
+
 ## H8 — Retire the old Forge app (10 min, do it once the new one is live)
 The old app's database can be read and written by anyone who has the key published in the old public repo. Shut it down:
 1. Anything you want to keep: Supabase → old project → Table Editor → pick a table → Export to CSV.
