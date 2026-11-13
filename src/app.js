@@ -5,7 +5,7 @@ import {
   validateValue, visibleQuestions, isAnswered, progress, nextQuestion, prevQuestion,
   answersToScenario, REQUIRED_FOR_PLAN,
 } from './onboarding/answers.js';
-import { createStore, setAnswer, setUnknown, exportAnswers, importAnswers } from './onboarding/state.js';
+import { createStore, setAnswer, setUnknown, importAnswers } from './onboarding/state.js';
 import { renderInput, readInput } from './onboarding/inputs.js';
 import { esc, money, monthLabel, currentMonth, summarize, ageLabel, pct } from './ui/format.js';
 import { createFx, fxBadge } from './fx/fx.js';
@@ -97,7 +97,7 @@ function focusFirst(root) {
 }
 function persistBanner() {
   return store.persistent ? '' :
-    '<p class="banner" role="status">This browser isn’t saving your answers. Export a backup before you close it.</p>';
+    '<p class="banner" role="status">This browser isn’t saving your answers. Back up (Settings → Back up everything) before you close it.</p>';
 }
 
 // ---------------- welcome ----------------
@@ -210,15 +210,17 @@ function finish() {
 // ---------------- the plan's scenario: your answers + the life events you added (T2.6) ----------------
 const data = createLocalStore();
 let userEvents = []; // loaded at boot from settings.events (kept in full backups)
+let appSettings = {}; // the store's settings (events, assumption overrides) — loaded at boot
 function buildScenario(events = userEvents) {
-  const out = answersToScenario(state.answers, { today: currentMonth(), convert: (a, from, to) => fx.convert(a, from, to) });
+  const ov = appSettings.assumptions || {};
+  const out = answersToScenario(state.answers, { today: currentMonth(), convert: (a, from, to) => fx.convert(a, from, to), inflation: ov.inflation, cashRealReturn: ov.cashRealReturn });
   if (!out.scenario) return { out, s: null, problems: [] };
   const { scenario, problems } = expandEvents({ ...out.scenario, events: [...(out.scenario.events || []), ...events] });
   return { out, s: scenario, problems };
 }
 async function saveUserEvents(events) {
   userEvents = events;
-  await data.saveSettings({ events });
+  appSettings = await data.saveSettings({ events });
 }
 
 // ---------------- what changed (after editing an answer) ----------------
@@ -318,8 +320,8 @@ function reviewHTML() {
       ${groups}
       <div class="stack">
         <button class="btn" data-act="paste-open">Paste answers from the intake doc</button>
-        <button class="btn" data-act="export">Export a backup</button>
-        <label class="btn as-label">Import a backup<input type="file" accept="application/json,.json" data-act="import" hidden></label>
+        <button class="btn" data-act="export">Back up everything</button>
+        <label class="btn as-label">Restore from a backup<input type="file" accept="application/json,.json" data-act="import" hidden></label>
         <button class="btn danger" data-act="reset">${screen.confirmReset ? 'Tap again to delete all answers' : 'Start over'}</button>
       </div>
       ${persistBanner()}
@@ -907,16 +909,92 @@ function settingsHTML() {
       <a class="row" href="#answers"><span class="row-l">Your answers</span><span class="row-v">${full.done} of ${full.total}</span><span class="row-c" aria-hidden="true">›</span></a>
     </section>
     ${prefsHTML()}
+    ${assumptionsHTML()}
     <section class="card list"><h2 class="list-h">Your data</h2>
-      <button class="row" data-act="export"><span class="row-l">Export a backup</span><span class="row-c" aria-hidden="true">›</span></button>
-      <label class="row as-label"><span class="row-l">Import a backup</span><span class="row-c" aria-hidden="true">›</span><input type="file" accept="application/json,.json" data-act="import" hidden></label>
-      <button class="row danger" data-act="reset"><span class="row-l">${screen.confirmReset ? 'Tap again to delete all answers' : 'Start over'}</span></button>
-      <p class="list-note">Everything is stored on this device only${store.persistent ? '' : ' — and this browser isn’t saving it, so export a backup'}.</p>
+      <button class="row" data-act="export"><span class="row-l">Back up everything</span><span class="row-v">answers, events, budget</span><span class="row-c" aria-hidden="true">›</span></button>
+      <label class="row as-label"><span class="row-l">Restore from a backup</span><span class="row-c" aria-hidden="true">›</span><input type="file" accept="application/json,.json" data-act="import" hidden></label>
+      <button class="row danger" data-act="wipe"><span class="row-l">${screen.confirmWipe ? 'Tap again — this deletes everything on this phone' : 'Delete all my data'}</span></button>
+      <p class="list-note">Everything is stored on this phone only${store.persistent && data.persistent ? '' : ' — and this browser isn’t saving it, so back up now'}. Back up now and then; a backup is one file you can keep in iCloud Drive.</p>
     </section>
     <section class="card list"><h2 class="list-h">About</h2>
       <p class="list-note">Forge is a planning tool. Estimates, not financial advice. All figures in today’s money.</p>
     </section>
   </div>`;
+}
+
+// Assumptions: three come from your answers (edit the question); inflation and cash growth are settings.
+function assumptionsHTML() {
+  const { s } = buildScenario();
+  const a = s ? s.assumptions : null;
+  const row = (q, label, value) => `<button class="row" data-act="edit" data-val="${q}" data-return="settings"><span class="row-l">${label}</span><span class="row-v">${esc(value)}</span><span class="row-c" aria-hidden="true">›</span></button>`;
+  const num = (key, label, value) => `<button class="row" data-act="set-num" data-val="${key}"><span class="row-l">${label}</span><span class="row-v">${esc(value)}</span><span class="row-c" aria-hidden="true">›</span></button>`;
+  const ov = appSettings.assumptions || {};
+  return `<section class="card list"><h2 class="list-h">Money and assumptions</h2>
+    ${row('q7', 'Main currency', base() === 'AUD' ? 'A$ Aussie dollars' : '£ Pounds')}
+    ${a ? row('q55', 'Investment return', `${pct(a.nominalReturn)} a year`) : ''}
+    ${a ? row('q66', 'Withdrawal rate', pct(a.withdrawalRate)) : ''}
+    ${num('inflation', 'Inflation', `${pct(Number.isFinite(ov.inflation) ? ov.inflation : 0.025)} a year`)}
+    ${num('cashRealReturn', 'Cash growth after inflation', `${pct(Number.isFinite(ov.cashRealReturn) ? ov.cashRealReturn : 0)} a year`)}
+    <p class="list-note">The second currency is ${base() === 'AUD' ? '£' : 'A$'}; amounts in it are converted at live rates.</p></section>`;
+}
+const NUM_SETTINGS = {
+  inflation: { label: 'Inflation', help: 'How fast prices rise each year. Everything in Forge is in today’s money; this sets how much returns are worth after rising prices.', def: 0.025, min: -2, max: 10 },
+  cashRealReturn: { label: 'Cash growth after inflation', help: 'What savings in cash earn beyond inflation. 0% means cash just keeps its value; negative means it loses value.', def: 0, min: -5, max: 5 },
+};
+function openNumberSetting(key) {
+  const N = NUM_SETTINGS[key];
+  const cur = (appSettings.assumptions || {})[key];
+  openSheet({ label: N.label, html: `<div class="sh-top"><h2 class="h2">${esc(N.label)}</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <p class="sub">${esc(N.help)}</p>
+    <div class="field"><label for="ns">Percent a year</label><div class="num"><input class="in" id="ns" inputmode="decimal" value="${+(((Number.isFinite(cur) ? cur : N.def)) * 100).toFixed(2)}" autocomplete="off"><span class="num-unit">%</span></div></div>
+    <p class="sh-err" role="alert" data-ns-err></p>
+    <div class="sh-actions"><button class="btn" data-ns="reset">Use the default (${pct(N.def)})</button><button class="btn primary" data-ns="save">Save</button></div>`,
+  onClick: async (e) => {
+    const b = e.target.closest('[data-ns]');
+    if (!b) return;
+    let v;
+    if (b.dataset.ns === 'reset') v = undefined;
+    else {
+      const raw = String(sheetBody().querySelector('#ns').value).replace('−', '-').replace(/[^0-9.\-]/g, '');
+      const n = Number(raw);
+      if (raw === '' || !Number.isFinite(n) || n < N.min || n > N.max) { sheetBody().querySelector('[data-ns-err]').textContent = `Enter a number from ${N.min} to ${N.max}.`; return; }
+      v = n / 100;
+    }
+    const before = planSnap();
+    const next = { ...(appSettings.assumptions || {}) };
+    if (v === undefined) delete next[key]; else next[key] = v;
+    appSettings = await data.saveSettings({ assumptions: next });
+    const lines = diffSnapshots(before, planSnap(), { currency: base() });
+    closeSheet();
+    render('none', { keepScroll: true });
+    toast(`${N.label} saved${lines.length ? ' — ' + lines[0] : ''}`);
+  } });
+}
+// Full backup / restore / delete-all (T2.8). Restore replaces everything, so it asks first.
+async function exportEverything() {
+  download(`forge-backup-${isoToday()}.json`, await data.exportAll());
+  toast('Backup saved — keep the file somewhere safe');
+}
+function openRestore(text) {
+  let info;
+  try { info = parseBackupInfo(text); } catch (e) { return alertInline(e.message); }
+  openSheet({ label: 'Restore backup', html: `<div class="sh-top"><h2 class="h2">Restore this backup?</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <p class="sub">From ${esc(info.when)}. It <b>replaces everything</b> on this phone:</p>
+    <ul class="bul"><li>${info.answers} answer${info.answers === 1 ? '' : 's'}</li><li>${info.events} life event${info.events === 1 ? '' : 's'} you added</li><li>${info.budget ? 'Your budget and investments' : 'No budget'}</li></ul>
+    <div class="sh-actions single"><button class="btn primary" data-rs="go">Restore</button></div>`,
+  onClick: async (e) => {
+    if (!e.target.closest('[data-rs="go"]')) return;
+    await data.importAll(text);
+    location.reload(); // everything re-reads from storage
+  } });
+}
+function parseBackupInfo(text) {
+  let d;
+  try { d = JSON.parse(text); } catch { throw new Error('That file isn’t a Forge backup.'); }
+  if (!d || d.app !== 'forge' || d.kind !== 'full-backup') throw new Error('That file isn’t a full Forge backup.');
+  return { when: d.exportedAt ? new Date(d.exportedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'an unknown date',
+    answers: d.onboarding && d.onboarding.answers ? Object.keys(d.onboarding.answers).length : 0,
+    events: d.settings && Array.isArray(d.settings.events) ? d.settings.events.length : 0, budget: !!d.budget };
 }
 
 // Preferences come from your answers; each row reopens that question and Save returns here.
@@ -1051,7 +1129,17 @@ app.addEventListener('click', (e) => {
     pendingChange = { n: null, lines: [`Saved ${Object.keys(add).length} answers from your paste.`, ...(before !== undefined ? diffSnapshots(before, planSnap(), { currency: base() }) : [])] };
     return go({ name: 'review' }, 'back');
   }
-  if (act === 'export') return download(`forge-answers-${currentMonth()}.json`, exportAnswers(state));
+  if (act === 'export') { exportEverything(); return; }
+  if (act === 'set-num') return openNumberSetting(val);
+  if (act === 'wipe') {
+    if (!screen.confirmWipe) { screen = { ...screen, confirmWipe: true }; return render('none', { keepScroll: true }); }
+    data.clearAll().then(() => {
+      state = store.reset();
+      try { history.replaceState(null, '', location.pathname + location.search); } catch { /* ignore */ }
+      location.reload();
+    });
+    return;
+  }
   if (act === 'reset') {
     if (!screen.confirmReset) { screen = { ...screen, confirmReset: true }; return render('none', { keepScroll: true }); }
     state = store.reset();
@@ -1066,7 +1154,11 @@ app.addEventListener('change', (e) => {
   if (input.matches('[data-act="bud-import"]') && input.files && input.files[0]) { budImportFile(input.files[0]); input.value = ''; return; }
   if (!input.matches('[data-act="import"]') || !input.files || !input.files[0]) return;
   input.files[0].text().then((text) => {
-    const answers = importAnswers(text, KNOWN_IDS);
+    input.value = '';
+    let kind = null;
+    try { kind = JSON.parse(text).kind; } catch { /* handled below */ }
+    if (kind === 'full-backup') return openRestore(text);
+    const answers = importAnswers(text, KNOWN_IDS); // older answers-only backups still work
     state = store.save({ ...state, answers: { ...state.answers, ...answers }, mode: state.mode || 'full' });
     go({ name: 'review' });
   }).catch((err) => alertInline(err.message || 'Couldn’t read that file.'));
@@ -1091,7 +1183,7 @@ if (state.completedAt) {
 // Load the life events you added (settings.events), then draw. LocalStore reads are synchronous under the
 // hood, so this resolves on the next microtask — no visible delay.
 Promise.all([
-  data.getSettings().then((st) => { userEvents = Array.isArray(st.events) ? st.events : []; }),
+  data.getSettings().then((st) => { appSettings = st || {}; userEvents = Array.isArray(st.events) ? st.events : []; }),
   data.getBudget().then((b) => { budget = b; }),
 ]).catch(() => {}).finally(() => render('none'));
 // Live FX in the background; if the plan is on screen and rates changed, refresh it in place.

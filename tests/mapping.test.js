@@ -124,3 +124,17 @@ test('q3: coming back to the UK is a timeline mark; its costs are not placed', (
   assert.deepEqual(r.scenario.marks.find((m) => /UK/.test(m.label)), { at: '2028-06', label: 'Move back to the UK (Taunton)' });
   assert.ok(r.notPlaced.some((t) => /UK move/.test(t)));
 });
+
+test('settings overrides: inflation and cash growth flow into the scenario and the assumption wording', () => {
+  const r = answersToScenario(A({ ...core, q49: { cashGBP: gbp(1000) }, q13: ['Loan'], ...pilot, q15: { amount: gbp(12000), rate: 0, start: '2027-11', years: 1 } }),
+    { today, inflation: 0.03, cashRealReturn: -0.01 });
+  assert.equal(r.scenario.assumptions.inflation, 0.03);
+  assert.equal(r.scenario.assumptions.cashRealReturn, -0.01);
+  assert.ok(r.assumptions.includes('Inflation: 3% a year. All figures are in today’s money.'));
+  assert.ok(r.assumptions.some((t) => /Cash savings grow -1% a year after inflation/.test(t)));
+  // loan repayments deflate at the overridden rate: first payment a year after today → ÷1.03
+  near(item(r, 'training-loan').steps[0].monthly, 1000 / 1.03, 1e-9);
+  const d = answersToScenario(A({ ...core, q49: { cashGBP: gbp(1000) } }), { today });
+  assert.equal(d.scenario.assumptions.inflation, 0.025);
+  assert.equal(d.scenario.assumptions.cashRealReturn, undefined);
+});

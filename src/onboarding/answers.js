@@ -105,6 +105,9 @@ const addYears = (s, y) => addMonths(s, Math.round(y * 12));
 // opts.today: 'YYYY-MM'. opts.convert(amount, from, to): currency conversion (injected so this stays pure).
 export function answersToScenario(answers, opts = {}) {
   const today = opts.today;
+  // Settings can override two assumptions (T2.8): inflation, and cash growth after inflation.
+  const inflation = Number.isFinite(opts.inflation) ? opts.inflation : DEFAULT_INFLATION;
+  const cashReal = Number.isFinite(opts.cashRealReturn) ? opts.cashRealReturn : 0;
   if (!today) throw new Error('answersToScenario needs opts.today (YYYY-MM)');
   const convert = opts.convert || ((a, from, to) => {
     if (from === to) return a;
@@ -135,7 +138,7 @@ export function answersToScenario(answers, opts = {}) {
   if (nominalReturn == null) { nominalReturn = 0.07; assumptions.push('Investment return: 7% a year before inflation (middle case).'); }
   let withdrawalRate = WITHDRAWALS[v(answers, 'q66')];
   if (withdrawalRate == null) { withdrawalRate = 0.04; assumptions.push('Withdrawal rate: 4% a year.'); }
-  assumptions.push(`Inflation: ${DEFAULT_INFLATION * 100}% a year. All figures are in today’s money.`);
+  assumptions.push(`Inflation: ${+(inflation * 100).toFixed(2)}% a year. All figures are in today’s money.`);
 
   // Opening pots (q49), each in the base currency with its own growth and access rules (T1.2).
   const bal = v(answers, 'q49') || {};
@@ -151,7 +154,7 @@ export function answersToScenario(answers, opts = {}) {
   }
   // Positive cash flow is invested in the ISA if there is one, else in "Other savings"/a new invested pot.
   const openingPot = pots.reduce((sum, p) => sum + p.balance, 0);
-  if (pots.some((p) => p.kind === 'cash')) assumptions.push('Cash savings keep pace with inflation but don’t grow beyond it (0% real). Shares grow at the investment return.');
+  if (pots.some((p) => p.kind === 'cash')) assumptions.push(cashReal === 0 ? 'Cash savings keep pace with inflation but don’t grow beyond it (0% real). Shares grow at the investment return.' : `Cash savings grow ${+(cashReal * 100).toFixed(2)}% a year after inflation. Shares grow at the investment return.`);
   const sup = pots.find((p) => p.kind === 'super');
   if (sup) {
     assumptions.push(`Australian super can’t be touched until ${sup.accessAge} (ATO preservation age for your birth date), and only once you meet a condition of release such as retiring. Estimate — check with your fund.`);
@@ -208,7 +211,7 @@ export function answersToScenario(answers, opts = {}) {
       for (let y = 0; y < Math.ceil(n / 12); y++) {
         const from = addYears(loan.start, y);
         const yearsFromToday = (ym(from) - ym(today)) / 12;
-        loanSteps.push({ from, monthly: pay / Math.pow(1 + DEFAULT_INFLATION, Math.max(0, yearsFromToday)) });
+        loanSteps.push({ from, monthly: pay / Math.pow(1 + inflation, Math.max(0, yearsFromToday)) });
       }
       items.push({ id: 'training-loan', name: 'Training loan repayments', kind: 'expense', steps: loanSteps,
         from: loan.start, to: addMonths(loan.start, n - 1), nominalMonthly: pay });
@@ -368,7 +371,7 @@ export function answersToScenario(answers, opts = {}) {
     marks,
     investShare: 1,
     redirectAfterCoast: v(answers, 'q57') === 'Spend more now once on track',
-    assumptions: { nominalReturn, inflation: DEFAULT_INFLATION, withdrawalRate, retirementSpend, otherRetirementIncome },
+    assumptions: { nominalReturn, inflation, withdrawalRate, retirementSpend, otherRetirementIncome, ...(cashReal ? { cashRealReturn: cashReal } : {}) },
     items,
     oneOffs: keptOneOffs,
   };

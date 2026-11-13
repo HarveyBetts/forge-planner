@@ -324,7 +324,21 @@ HUMAN_TODO H9 (how to import from Google Sheets).
 → cancel (still empty) → import → save; exact net worth at fixed rates and date; week values; edit food and a "+15" refund → totals
 and forecast update, persisted after reload; week navigation; bills ("tomorrow"); investments total, price update; use balances →
 q49 written with super untouched. Non-xlsx file → readable error; start from scratch; remove. Screenshots
-`artifacts/budget-import-check.png`, `budget-money.png`, `budget-investments.png`. `npm run check` → 206/206; e2e 27/27.
+`artifacts/budget-import-check.png`, `budget-money.png`, `budget-investments.png`. `npm run check` → 205/205; e2e 27/27.
 **Needs Harvey's eyes:** import your real sheet (H9) and check the numbers against Google Sheets. Typing amounts into the
 week rows on the phone.
 
+## 2026-11-13 T2.8 — Settings: full backup, restore, delete all, assumptions
+**Changed:** Settings → **Money and assumptions**: main currency (q7), investment return (q55), withdrawal rate (q66) open their
+questions; **inflation** and **cash growth after inflation** are real settings (sheet with a % input, range-checked, "use the
+default"), stored in `settings.assumptions` and fed into `answersToScenario` (which now takes `inflation` / `cashRealReturn`, used
+for the scenario, the loan deflation and the assumption wording); saving shows what moved in a toast. **Your data**: **Back up
+everything** downloads one JSON (answers, events, budget, settings) named `forge-backup-YYYY-MM-DD.json`; **Restore from a backup**
+accepts a full backup (asks first — "replaces everything", with counts — then reloads) or an older answers-only backup (merged as
+before); **Delete all my data** (two taps) wipes every Forge key and returns to the welcome screen. Done ahead of T2.7 because the
+old export only saved answers — with a budget and events on the phone, that risked losing data.
+**Verified:** `tests/mapping.test.js` (+1: overrides reach the scenario, wording and loan deflation; defaults unchanged).
+`tests/e2e/backup.spec.js` (2): import a budget + add an event + set inflation 3% → back up (file name, contents checked) → delete
+all (storage empty, welcome screen) → restore from the welcome screen (confirm sheet with counts) → inflation, event, budget and
+the plan's assumption all back; junk file → readable message. `npm run check` → 206/206; e2e 29/29.
+**Needs Harvey's eyes:** where the backup file lands on the iPhone (Files → Downloads) — keep a copy in iCloud Drive.
