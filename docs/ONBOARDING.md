@@ -34,7 +34,7 @@ life events placed on the timeline, what's *not* in the plan yet (with question 
 | `src/ui/format.js` | `esc`, `money`, `monthLabel`, `summarize` (answer one-liners for Review). |
 | `src/fx/fallback.js` | Approximate offline GBP/AUD rates (from legacy Forge) used until T1.1 lands. UI labels conversions "approximate". |
 | `tests/onboarding.test.js` | 22 unit tests: bank integrity, validation, conditions, progress, mapping, storage failure modes, backup round-trip. |
-| `tests/e2e/onboarding.walk.mjs` | Playwright walk of Quick start with **sample** answers → plan; fails on console errors or horizontal overflow; screenshots to `artifacts/`. |
+| `tests/e2e/onboarding.spec.js` | Playwright walk of Quick start with **sample** answers → plan; fails on console errors or horizontal overflow; screenshots to `artifacts/`. |
 | `docs/QUESTIONS.md` | Human-readable list, **generated** — run `npm run docs:questions` after editing the bank. |
 
 ## Answer storage format
@@ -72,7 +72,7 @@ Events dated before today or after retirement are dropped and noted.
 - After editing: `npm run check`, `npm run docs:questions`, and the e2e walk.
 
 ## Follow-ups (also in TASKS.md, T2.2a–f)
-a. Port `tests/e2e/onboarding.walk.mjs` into the Playwright suite from T0.2 and run it in CI.
+a. Port `tests/e2e/onboarding.spec.js` into the Playwright suite from T0.2 and run it in CI.
 b. Map the remaining answers into the scenario: training cost/loan repayments (q14/q15), income during training (q16),
    parental-leave dip (q76), mortgage payments + buying costs (q99/q100), university (q87), school-fee inflation (q92),
    car running costs (q111), captain upgrade (q21), UK return / relocation (q3) — each with tests.

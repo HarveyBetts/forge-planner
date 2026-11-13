@@ -62,3 +62,10 @@ reload, stale-but-real kept when offline, HTTP error/bad JSON/corrupt cache/host
 Found and fixed a bug while testing: a cache timestamp of 0 read as "never fetched". Plan screen screenshot `artifacts/onb-5-plan.png`.
 **Needs Harvey's eyes:** nothing new visually (one extra line in Assumptions).
 
+## 2026-11-13 T2.2a — Onboarding walk in the Playwright suite
+**Changed:** `tests/e2e/onboarding.spec.js` replaces the standalone `onboarding.walk.mjs` (which couldn't find a browser here):
+same sample answers, waits on real state changes instead of fixed sleeps, asserts no overflow on every question, Plan after
+finishing, resume-to-Plan after reload, Review screen, zero console errors. `walkQuickStart()` is exported for reuse.
+CI `e2e` job (T0.2) runs it and uploads `artifacts/` (dormant until the repo split — D14).
+**Verified:** `npm run test:e2e` → 2 passed; screenshots `artifacts/onb-1…6`.
+**Needs Harvey's eyes:** nothing new.

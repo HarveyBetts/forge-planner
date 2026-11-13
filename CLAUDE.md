@@ -125,7 +125,8 @@ npm run serve        # dev server on http://localhost:8080
 npm run build:site   # stage public files into _site/
 npm run auto         # headless loop (needs the `claude` CLI; see README)
 npm run docs:questions  # regenerate docs/QUESTIONS.md after editing the question bank
-npm run test:walk    # Playwright walk of onboarding (needs `npm run serve` running + playwright installed)
+npm run test:e2e     # Playwright suite at iPhone size (starts its own server; screenshots → artifacts/)
+npm run test:walk    # just the onboarding walk
 ```
 
 ## 8. Where things are

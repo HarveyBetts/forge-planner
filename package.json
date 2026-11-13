@@ -12,7 +12,7 @@
     "build:site": "bash scripts/build-site.sh",
     "auto": "bash scripts/run-autonomous.sh",
     "docs:questions": "node scripts/gen-questions-doc.mjs",
-    "test:walk": "node tests/e2e/onboarding.walk.mjs",
+    "test:walk": "playwright test onboarding",
     "test:e2e": "playwright test",
     "seed": "node scripts/seed.mjs"
   },
