@@ -1,0 +1,26 @@
+// Shared e2e helpers: error collection, overflow check, and blocking external hosts
+// (fonts) so runs are deterministic and offline-safe.
+import { expect } from '@playwright/test';
+
+export const ART = 'artifacts';
+
+export async function prepare(page) {
+  const errors = [];
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', (e) => errors.push(String(e)));
+  // Google Fonts are optional (system fallbacks exist); don't let the network decide pass/fail.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  return errors;
+}
+
+export async function expectNoOverflow(page, label) {
+  const o = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(o, `horizontal overflow on ${label}`).toBeLessThanOrEqual(1);
+}
+
+// Run a fresh, empty-storage session.
+export async function fresh(page, path = '/') {
+  await page.goto(path);
+  await page.evaluate(() => { try { localStorage.clear(); } catch {} });
+  await page.goto(path);
+}
