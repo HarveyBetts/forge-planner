@@ -262,3 +262,12 @@ test('v() treats "don\'t know" as no value', () => {
   assert.equal(v({ q1: { v: 'x' } }, 'q1'), 'x');
   assert.equal(optValue({ v: 'GBP', l: '£' }), 'GBP');
 });
+
+import { ageLabel, pct } from '../src/ui/format.js';
+test('format: ageLabel and pct', () => {
+  assert.equal(ageLabel(58), '58');
+  assert.equal(ageLabel(58.25), '58 and 3 months');
+  assert.equal(ageLabel(58 + 1 / 12), '58 and 1 month');
+  assert.equal(pct(0.07), '7%');
+  assert.equal(pct(0.07229), '7.2%');
+});

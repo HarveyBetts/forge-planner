@@ -7,10 +7,11 @@ import {
 } from './onboarding/answers.js';
 import { createStore, setAnswer, setUnknown, exportAnswers, importAnswers } from './onboarding/state.js';
 import { renderInput, readInput } from './onboarding/inputs.js';
-import { esc, money, monthLabel, currentMonth, summarize } from './ui/format.js';
+import { esc, money, monthLabel, currentMonth, summarize, ageLabel, pct } from './ui/format.js';
 import { createFx, fxBadge } from './fx/fx.js';
+import { whatMustBeTrue } from './engine/solve.js';
 import {
-  projectScenario, projectFan, solveMonthlyContribution, scenarioCoastStatus, ym,
+  projectScenario, projectFan, scenarioCoastStatus, ym,
 } from './engine/engine.js';
 
 const app = document.getElementById('app');
@@ -206,17 +207,17 @@ function computePlan() {
   const res = projectScenario(s);
   const cs = scenarioCoastStatus(s);
   const fan = projectFan(s, [0.04, 0.07, 0.09]);
-  const extra = res.onTrack ? 0 : solveMonthlyContribution(s);
+  const levers = res.onTrack ? null : whatMustBeTrue(s);
   const inv = (s.items.find((i) => i.id === 'investing') || {}).steps || [];
   const investingNow = inv.length ? inv.filter((st) => ym(st.from) <= ym(today)).pop()?.monthly || 0 : 0;
   const status = res.depletedAt ? 'short' : cs.isCoasting ? 'coasting' : res.onTrack ? 'on-track' : 'behind';
-  return { ...out, today, s, res, cs, fan, extra, investingNow, status };
+  return { ...out, today, s, res, cs, fan, levers, investingNow, status };
 }
 
 function planHTML() {
   const P = computePlan();
   if (!P.scenario) return reviewHTML();
-  const { s, res, cs, fan, extra, status } = P;
+  const { s, res, cs, fan, levers, status } = P;
   const cur = s.baseCurrency;
   const m = (x, c) => money(x, cur, { compact: c });
   const chip = {
@@ -251,16 +252,30 @@ function planHTML() {
         <span class="lab">At ${s.retirementAge} you’d have, in today’s money</span>
         ${rangeHTML(fan, m)}
         ${chart(res, cur)}
-        ${extra ? `<p class="callout warn">Investing about <strong>${m(extra)}</strong> more a month from now would close the gap.</p>` : ''}
-        ${extra === null ? '<p class="callout warn">The target isn’t reachable by investing more alone. Try a later age or a lower spend.</p>' : ''}
         ${res.lockedAtRetirement.map((l) => `<p class="callout warn">${esc(l.name)} (about ${m(l.value, true)} by then) stays locked until ${monthLabel(l.opens)}, ${l.yearsAfterRetirement % 1 ? l.yearsAfterRetirement.toFixed(1) : l.yearsAfterRetirement} years after you stop work. Your other savings need to cover that gap.</p>`).join('')}
       </section>
+      ${levers ? leversHTML(levers, s, m) : ''}
       ${events.length ? `<section class="card"><h2 class="rv-h">Life events in your plan</h2><ul class="ev">${events.map((e) =>
         `<li><span class="ev-d">${monthLabel(e.at)}</span><span class="ev-n">${esc(e.name)}</span><span class="ev-a ${e.amt < 0 ? 'neg' : ''}">${money(e.amt, cur, { compact: true })}${e.per || ''}</span></li>`).join('')}</ul></section>` : ''}
       ${P.notPlaced.length ? `<section class="card"><h2 class="rv-h">Not in the plan yet</h2><ul class="bul">${P.notPlaced.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></section>` : ''}
       <section class="card"><h2 class="rv-h">Assumptions</h2><ul class="bul">${P.assumptions.map((t) => `<li>${esc(t)}</li>`).join('')}<li>Amounts in other currencies converted at mid-market rates (${esc(fxBadge(fx))}).</li></ul></section>
       <p class="foot">Estimates, not financial advice. All figures in today’s money.</p>
     </div>`;
+}
+
+// "Any one of these would get you there" — each lever on its own. null = not reachable by that lever alone.
+function leversHTML(L, s, m) {
+  const row = (label, value, note = '') => `<li><span class="lv-l">${label}</span><span class="lv-v">${value}</span>${note ? `<span class="lv-n">${note}</span>` : ''}</li>`;
+  const no = '<span class="lv-no">Not enough on its own</span>';
+  const rows = [
+    row('Invest more each month', L.extraMonthly == null ? no : `+${m(L.extraMonthly)}`, L.extraMonthly == null ? '' : 'from now until you stop work'),
+    row('Stop work at', L.retirementAge == null ? `${no}` : `${esc(ageLabel(L.retirementAge))}`, L.retirementAge == null ? 'not even by 80' : `instead of ${s.retirementAge}`),
+    row('Spend in retirement', L.retirementSpend == null ? no : `${m(L.retirementSpend)}/yr`, L.retirementSpend == null ? '' : `${m(L.spendCut)} a year less than planned`),
+    row('Returns before inflation', L.nominalReturn == null ? no : `${pct(L.nominalReturn)} a year`,
+      L.nominalReturn == null ? 'even at 20%' : L.nominalReturn > 0.09 ? 'above the optimistic 9% case — risky to rely on' : `instead of ${pct(s.assumptions.nominalReturn)}`),
+  ];
+  return `<section class="card"><h2 class="rv-h">Any one of these would get you there</h2><ul class="levers">${rows.join('')}</ul>
+    <p class="mini">Each on its own, with everything else unchanged. Estimates in today’s money.</p></section>`;
 }
 
 // Low–high range at retirement. A negative pot is a shortfall, not a number to show as "−£300k".

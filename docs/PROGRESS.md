@@ -97,3 +97,16 @@ switched `off`. Conventions logged in D19.
 18th birthday; mortgage = exactly 300 payments; cars Mar 2029/2037/2045 then stop at retirement), plus no-invented-salary,
 idempotency incl. full undo of patches, invalid-event reporting, engine projection. `npm run check` → 97/97.
 **Needs Harvey's eyes:** nothing yet (no UI until T2.6). Bring your Speedbird offer figures when we get to the event editor.
+
+## 2026-11-13 T1.4 — "What must be true" solvers
+**Changed:** `src/engine/solve.js` — `bisectMin/bisectMax`, `requiredNominalReturn` (0–20%), `requiredRetirementAge`
+(earliest month, integer bisection + verification scan), `affordableRetirementSpend`, `whatMustBeTrue` (all levers; `null` =
+not reachable by that lever alone). `projectScenario` now expands `events` itself (idempotent), so every solver includes
+life events. Plan screen: the single "invest £X more" callout became an **"Any one of these would get you there"** card
+(invest more / stop work at / spend in retirement / returns needed), with unreachable levers in words ("Not enough on its
+own", "not even by 80", "even at 20%") and returns above the optimistic 9% flagged as risky. `ageLabel`, `pct` formatters.
+**Verified:** `tests/solve.test.js` (8): bisection boundaries + null, affordable spend = closed form pot×rate (+ other income),
+required return on track while −0.1% isn't and matches the analytic rate, retirement age exact to the month (and one month
+earlier fails), unreachable → null, whatMustBeTrue never yields NaN, events are seen by solvers. e2e asserts the card has 4
+rows and no NaN/null/undefined; screenshot `artifacts/plan-levers.png`. `npm run check` → 106/106.
+**Needs Harvey's eyes:** the levers card wording and layout.

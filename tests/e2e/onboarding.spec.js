@@ -47,6 +47,11 @@ test('quick-start onboarding → plan, resumes after reload', async ({ page }) =
   await expectNoOverflow(page, 'plan');
   await page.screenshot({ path: `${ART}/onb-5-plan.png`, fullPage: true });
   await expect(page.getByText(/Australian super .* stays locked until Mar 2057/)).toBeVisible();
+  const levers = page.locator('section', { has: page.getByRole('heading', { name: 'Any one of these would get you there' }) });
+  await expect(levers).toBeVisible();
+  await expect(levers.locator('li')).toHaveCount(4);
+  await expect(levers).not.toContainText(/NaN|null|undefined/);
+  await levers.screenshot({ path: `${ART}/plan-levers.png` });
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('forge.onboarding.v1')));
   expect(stored.completedAt).toBeTruthy();
   expect(Object.keys(stored.answers).length).toBeGreaterThanOrEqual(30);

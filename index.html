@@ -153,6 +153,11 @@ figcaption{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--m
 .ev-d{color:var(--muted);font-size:13px;font-weight:600}.ev-n{min-width:0}.ev-a{font-weight:600;font-variant-numeric:tabular-nums}.ev-a.neg{color:var(--muted)}
 .bul li{position:relative;padding:6px 0 6px 18px;font-size:15px;color:var(--muted)}
 .bul li::before{content:"";position:absolute;left:4px;top:15px;width:6px;height:6px;border-radius:50%;background:var(--line)}
+.levers{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.levers li{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:11px 0;border-top:1px solid var(--line);align-items:baseline}
+.levers li:first-child{border-top:0;padding-top:4px}
+.lv-l{font-size:15px;min-width:0}.lv-v{font:700 17px Sora,Inter,sans-serif;text-align:right;font-variant-numeric:tabular-nums}
+.lv-n{grid-column:1/-1;font-size:13px;color:var(--muted)}.lv-no{font:500 14px Inter,sans-serif;color:var(--muted)}
 .foot{text-align:center;color:var(--muted);font-size:13px;margin:6px 0 0}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (max-width:360px){.qtitle{font-size:22px}.qfoot{grid-template-columns:1fr 1fr 1.2fr}.btn{padding:0 10px;font-size:15px}.grid2{grid-template-columns:1fr}}

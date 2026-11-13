@@ -6,6 +6,7 @@
 // ---------- date helpers ('YYYY-MM' or 'YYYY-MM-DD' -> month index) ----------
 import { ym, fromYm } from './dates.js';
 import { accessMonth } from './pots.js';
+import { expandEvents } from './events.js';
 export { ym, fromYm };
 
 // ---------- core formulas ----------
@@ -91,6 +92,7 @@ function normalizePots(s) {
 const DRAW_ORDER = { cash: 0, invested: 1, pension: 2, super: 3 };
 
 export function projectScenario(s) {
+  if (Array.isArray(s.events) && s.events.length) s = expandEvents(s).scenario; // idempotent
   const a = s.assumptions;
   const r = realRate(a.nominalReturn, a.inflation);
   const startI = ym(s.start);

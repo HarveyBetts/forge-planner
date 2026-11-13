@@ -59,3 +59,15 @@ export function summarize(def, rec) {
   }
   return sub(def, val) ?? '';
 }
+
+// 58.25 -> "58 and 3 months"; 58 -> "58".
+export function ageLabel(age) {
+  const total = Math.round(Number(age) * 12);
+  const y = Math.floor(total / 12), mo = total % 12;
+  return mo ? `${y} and ${mo} month${mo === 1 ? '' : 's'}` : String(y);
+}
+// 0.0725 -> "7.3%"; 0.07 -> "7%".
+export function pct(x, dp = 1) {
+  const v = (Number(x) || 0) * 100;
+  return `${Number(v.toFixed(dp))}%`;
+}
