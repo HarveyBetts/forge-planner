@@ -231,3 +231,16 @@ priority, ring cap + coasting surplus, free money (coasting, investShare 80%, no
 no overflow; count-up once per session and not at all under reduced motion. Screenshots `artifacts/dashboard-{ahead,on-track,
 behind,coasting}.png`. `npm run check` → 169/169; e2e 18/18.
 **Needs Harvey's eyes:** ring fill + count-up timing on the phone; whether "£X needed today to stay on plan" is clear.
+
+## 2026-11-13 T2.4 — Projection chart
+**Changed:** `src/ui/chart.js` — `chartModel` (yearly samples of the middle case plus full 4% and 9% runs, glide path, target,
+coast month, actual check-ins), `chartSVG` (fan area, middle line, dashed "what your plan needs" line, target line, green coast
+marker — "Coasting now" when already there — actuals as dots, labelled money axis and age axis, descriptive `aria-label`),
+`readoutAt` (tap position → "Age 46 (Nov 2043): about £703k, range £503k – £886k; plan needs £573k; you had …"). Shortfalls are
+drawn at the baseline and said in words. Plan screen uses it with a legend and an aria-live readout; tap or drag (touch) moves a
+rule line — no hover tooltips. The range line names the middle-case return actually used.
+**Verified:** `tests/chart.test.js` (7): all layers, yearly sampling, never coasts (no marker), already coasting ("Coasting now"
+at the start), shortfall at the baseline + words, actuals dots + readout, too-short plan → nothing drawn, taps clamped.
+`tests/e2e/chart.spec.js` (3): typical / never-coasts / coasting render without NaN, tap updates the readout and shows the rule,
+no overflow. Screenshots `artifacts/chart-{typical,never-coasts,coasting}.png`. `npm run check` → 176/176; e2e 21/21.
+**Needs Harvey's eyes:** chart legibility at phone size, and the tap/drag feel.

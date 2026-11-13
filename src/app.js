@@ -16,8 +16,9 @@ import { settingsFromAnswers, behindCopy, applyTheme, LABELS } from './ui/settin
 import { planSnapshot, diffSnapshots } from './ui/whatchanged.js';
 import { parsePastedAnswers, entriesToAnswers } from './onboarding/paste.js';
 import { dashboardModel } from './ui/dashboard.js';
+import { chartModel, chartSVG, readoutAt } from './ui/chart.js';
 import {
-  projectScenario, projectFan, scenarioCoastStatus, ym,
+  projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
 
 const app = document.getElementById('app');
@@ -312,10 +313,13 @@ function computePlan() {
   const s = out.scenario;
   const res = projectScenario(s);
   const cs = scenarioCoastStatus(s);
-  const fan = projectFan(s, [0.04, 0.07, 0.09]);
+  const runAt = (nr) => projectScenario({ ...s, assumptions: { ...s.assumptions, nominalReturn: nr } });
+  const low = runAt(0.04), high = runAt(0.09);
+  const fan = [{ nominalReturn: 0.04, retirementPot: low.retirementPot }, { nominalReturn: s.assumptions.nominalReturn, retirementPot: res.retirementPot }, { nominalReturn: 0.09, retirementPot: high.retirementPot }];
   const levers = res.onTrack ? null : whatMustBeTrue(s);
   const D = dashboardModel(s, res, cs, { tone: settingsFromAnswers(state.answers).tone });
-  return { ...out, today, s, res, cs, fan, levers, D, status: D.status };
+  const chartM = chartModel({ mid: res, low, high, glide: D.glide, target: res.target, coastDate: res.coastDate, currency: s.baseCurrency, birth: s.birth, actuals: [] });
+  return { ...out, today, s, res, cs, fan, levers, D, chartM, status: D.status };
 }
 
 const CHIP_ICON = {
@@ -359,7 +363,7 @@ function planHTML() {
       <section class="card">
         <span class="lab">At ${s.retirementAge} you’d have, in today’s money</span>
         ${rangeHTML(fan, m)}
-        ${chart(res, cur)}
+        ${chartHTML(P.chartM)}
         ${res.lockedAtRetirement.map((l) => `<p class="callout warn">${esc(l.name)} (about ${m(l.value, true)} by then) stays locked until ${monthLabel(l.opens)}, ${l.yearsAfterRetirement % 1 ? l.yearsAfterRetirement.toFixed(1) : l.yearsAfterRetirement} years after you stop work. Your other savings need to cover that gap.</p>`).join('')}
       </section>
       ${levers ? leversHTML(levers, s, m) : ''}
@@ -397,7 +401,7 @@ function rangeHTML(fan, m) {
   }
   const fmt = (x) => (x < 0 ? 'short' : m(x, true));
   return `<span class="big">${fmt(lo)} – ${fmt(hi)}</span>` +
-    `<span class="mini">Middle case ${mid < 0 ? `short by ${m(-mid, true)}` : m(mid, true)}. Range uses 4%, 7% and 9% returns before inflation.</span>`;
+    `<span class="mini">Middle case (your ${pct(fan[1].nominalReturn)}) ${mid < 0 ? `short by ${m(-mid, true)}` : m(mid, true)}. Range uses 4% and 9% returns before inflation.</span>`;
 }
 
 function ring(ratio, big, label, animate = false, countTo = null) {
@@ -434,28 +438,29 @@ function animatePlan(root) {
   requestAnimationFrame(step);
 }
 
-// Pot (middle case) vs coast number, yearly, as a small SVG line chart.
-function chart(res, cur) {
-  const rows = res.rows.filter((_, i) => i % 12 === 0 || i === res.rows.length - 1);
-  if (rows.length < 2) return '';
-  const W = 320, H = 150, pad = 6;
-  const max = Math.max(res.target, ...rows.map((r) => r.pot), 1);
-  const x = (i) => pad + (i / (rows.length - 1)) * (W - pad * 2);
-  const y = (val) => H - pad - (Math.max(0, val) / max) * (H - pad * 2);
-  const line = (k) => rows.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(r[k]).toFixed(1)}`).join(' ');
-  const ci = res.coastDate ? rows.findIndex((r) => ym(r.ym) >= ym(res.coastDate)) : -1;
-  const first = rows[0], last = rows[rows.length - 1];
-  return `<figure class="chart">
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Projected pot rising to ${money(last.pot, cur, { compact: true })} by age ${Math.round(last.age)}, against the amount needed to coast">
-      <line x1="${pad}" x2="${W - pad}" y1="${y(res.target).toFixed(1)}" y2="${y(res.target).toFixed(1)}" class="c-target"/>
-      <path d="${line('coastNumber')}" class="c-coast"/>
-      <path d="${line('pot')}" class="c-pot"/>
-      ${ci >= 0 ? `<line x1="${x(ci).toFixed(1)}" x2="${x(ci).toFixed(1)}" y1="${pad}" y2="${H - pad}" class="c-mark"/>` : ''}
-    </svg>
-    <figcaption><span><i class="k pot"></i>Your pot (middle case)</span><span><i class="k coast"></i>Needed to coast</span><span><i class="k target"></i>Target</span></figcaption>
-    <div class="axis"><span>Age ${Math.round(first.age)}</span><span>Age ${Math.round(last.age)}</span></div>
-  </figure>`;
+// Projection chart (src/ui/chart.js) + tap-to-read readout (tooltips on tap, not hover — DESIGN.md).
+let chartNow = null;
+function chartHTML(M) {
+  chartNow = M;
+  if (!M) return '<p class="mini">Not enough time before you stop work to draw a chart.</p>';
+  return `<figure class="chart" data-chart>${chartSVG(M)}
+    <figcaption><span><i class="k fan"></i>Range (4–9% returns)</span><span><i class="k pot"></i>Middle case</span><span><i class="k glide"></i>What your plan needs</span><span><i class="k target"></i>Target</span></figcaption>
+    <p class="pc-read" aria-live="polite">Tap the chart to read the numbers at any age.</p></figure>`;
 }
+function chartTap(e) {
+  const hit = e.target.closest && e.target.closest('.pc-hit');
+  if (!hit || !chartNow) return;
+  const r = hit.getBoundingClientRect();
+  const frac = (e.clientX - r.left) / r.width;
+  const out = readoutAt(chartNow, frac);
+  const fig = hit.closest('[data-chart]');
+  fig.querySelector('.pc-read').textContent = out.text;
+  const rule = fig.querySelector('.pc-rule');
+  const xx = chartNow.x(out.i).toFixed(1);
+  rule.setAttribute('x1', xx); rule.setAttribute('x2', xx); rule.setAttribute('visibility', 'visible');
+}
+app.addEventListener('pointerdown', chartTap);
+app.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') chartTap(e); });
 
 // ---------------- timeline (v0: milestone list; T2.5 adds the scrubber) ----------------
 function needAnswersHTML(title) {
