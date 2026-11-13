@@ -16,7 +16,8 @@
     "test:e2e": "playwright test",
     "seed": "node scripts/seed.mjs",
     "test:rls": "bash scripts/rls-local.sh",
-    "test:ai-local": "node scripts/ai-function-local.mjs"
+    "test:ai-local": "node scripts/ai-function-local.mjs",
+    "eval:ai": "node scripts/ai-eval/run.mjs"
   },
   "engines": {
     "node": ">=20"

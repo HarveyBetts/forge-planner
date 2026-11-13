@@ -44,6 +44,8 @@ Supabase, never in the app or the repo.
    `SUPABASE_ACCESS_TOKEN` = the token from step 4; `SUPABASE_PROJECT_REF` = the Project ID from step 5.
 7. GitHub → forge-planner → **Actions → Deploy AI function → Run workflow** (branch main). A green tick = the AI is live.
 8. In Forge (signed in): Plan → **Ask Forge** and try "What if I return to the UK in 2028?".
+9. Optional (~US$1): tell Claude "run the AI eval" — it runs the 10-question quality check in `docs/AI_EVAL.md` against the
+   real model and reports back.
 Cost: each question is roughly US$0.04–0.12 on the default model (estimate from Anthropic's published per-token prices; longer
 plans and answers cost more). The daily cap and your spend limit bound it. If it ever misbehaves, delete the
 `ANTHROPIC_API_KEY` secret in Supabase and the AI switches off instantly; nothing else in Forge is affected.

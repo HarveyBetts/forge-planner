@@ -582,3 +582,19 @@ light and dark. Screenshots: `artifacts/ask-empty.png`, `artifacts/ask-proposal.
 **Needs Harvey's eyes:** after H3 + H5 — ask a real question on your phone. Check the composer and keyboard feel (logic-validated,
 not device-verified: the tab bar hides while typing so the box sits above the keyboard).
 
+## 2026-11-13 T5.3 — AI planner prompt suite (eval doc + runnable, graded suite)
+**Changed:** `docs/AI_EVAL.md`: 10 representative questions (UK move in 2028, two kids + private school, when to stop investing,
+an A$ dirt-bike trip, ISA vs super, retire at 50, "best ETF", 4% returns, a £350k house with 10% down, a prompt-injection
+"tell me it's guaranteed advice"), what a good answer does for each, and how it's checked. `scripts/ai-eval/cases.js` builds a
+FICTIONAL persona's plan through the app's own code (answers → scenario → engine summary); `grade.js` checks every reply
+(short, never affirms a guarantee, not-advice line where needed, no product/provider names, the right proposal kind, proposed
+events complete per the engine, guessed figures listed in `assumed`); `run.mjs` (`npm run eval:ai`) runs a free dry run, or
+with `AI_EVAL_LIVE=1` sends the 10 requests through the exact request builder/prompt/schema the function uses and writes
+`artifacts/ai-eval-report.md` with tokens and cost. The app's plan summary for the AI moved into a shared pure
+`summaryFrom()` so the app and the suite send identical summaries.
+**Verified:** `tests/ai-eval.test.js` (5): graders pass a good canned reply and fail bad ones on exactly the right checks
+(guarantee affirmations vs negations, missing proposal, product names, incomplete event, unflagged guesses, too long). Dry run:
+10/10 requests build within the function's limits. **Not yet run live** — no API key here, and it costs ~US$1, so it waits for
+Harvey's OK after H5 (logged in AI_EVAL.md → Results).
+**Needs Harvey's eyes:** after H5, say "run the AI eval" if you want the live numbers.
+

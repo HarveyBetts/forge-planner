@@ -57,7 +57,7 @@ Harvey's own spreadsheet (budget + investments) defines this phase — see D23. 
 ## Phase 5 — AI planner
 - [x] **T5.1** Finish + test `supabase/functions/planner-ai` (mock Deno/fetch): auth required, daily cap enforced, input/output size caps, no key leakage in errors. Deploy is Harvey's step (H5).
 - [x] **T5.2** Client `askPlanner(question, scenario)` + chat UI; show the AI's proposed change as a diff the user must accept (never auto-apply). Accept: tests with a mocked function.
-- [ ] **T5.3** Prompt suite: 10 representative questions (e.g. "what if I return to the UK in 2028?") with expected qualities; a markdown eval doc. Accept: eval doc committed.
+- [x] **T5.3** Prompt suite: 10 representative questions (e.g. "what if I return to the UK in 2028?") with expected qualities; a markdown eval doc. Accept: eval doc committed.
 
 ## Phase 6 — PWA & polish
 - [x] **T6.1** `manifest.webmanifest`, icons (reuse legacy Forge icons from its public repo), service worker (cache-first shell, network-first data), iOS standalone meta. Accept: Lighthouse-style checks documented.
