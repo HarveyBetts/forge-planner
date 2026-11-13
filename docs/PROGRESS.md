@@ -342,3 +342,17 @@ old export only saved answers — with a budget and events on the phone, that ri
 all (storage empty, welcome screen) → restore from the welcome screen (confirm sheet with counts) → inflation, event, budget and
 the plan's assumption all back; junk file → readable message. `npm run check` → 206/206; e2e 29/29.
 **Needs Harvey's eyes:** where the backup file lands on the iPhone (Files → Downloads) — keep a copy in iCloud Drive.
+
+## 2026-11-13 T2.7 — Scenario compare
+**Changed:** `src/ui/compare.js` (pure): `applyWhatIf` (a copy of your answers with kids / age at first child / stop-work age /
+retirement spend / investing now changed), `describeChanges`, `compareModel` (status, coast date with "3 yrs 2 mths later",
+pot when you stop, target, needed today, free money, stop-work age, savings run out — each with a delta and which side is better).
+Scenarios tab: your plan + your what-ifs (status chip, coast, pot), **New what-if** sheet with a live "compared with your plan"
+preview and "include the life events I added"; **Compare with your plan** → side-by-side view (A vs B, winners ticked, deltas);
+edit / delete (two taps). What-ifs live in `settings.whatifs` (in backups); your real answers are never changed.
+`buildScenario` takes an answers object so what-ifs reuse the exact plan pipeline.
+**Verified:** `tests/compare.test.js` (4): only the asked changes are applied (original untouched), wording, one-more-child deltas,
+coasting / never-coasting / running-out / shortfall wording. `tests/e2e/compare.spec.js`: **1 child vs 2 children** — create with
+live preview, compare shows a lower pot (A ticked), same target, more needed today; real answers still 1 child; edit pre-filled;
+delete. Screenshot `artifacts/compare-1-vs-2-children.png`. `npm run check` → 210/210.
+**Needs Harvey's eyes:** whether the compare rows are the ones you care about.

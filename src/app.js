@@ -26,6 +26,7 @@ import { readXlsx } from './budget/xlsx.js';
 import { workbookToBudget } from './budget/importsheet.js';
 import { emptyBudget, STARTER_CATEGORIES, weekRow, setEntry, addWeeks, weekLabel, forecastBy, upcomingBills, mondayOf } from './budget/ledger.js';
 import { cashNow, netWorth, parseEntry, entryText, defaultWeek } from './budget/view.js';
+import { applyWhatIf, describeChanges, compareModel } from './ui/compare.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -211,9 +212,9 @@ function finish() {
 const data = createLocalStore();
 let userEvents = []; // loaded at boot from settings.events (kept in full backups)
 let appSettings = {}; // the store's settings (events, assumption overrides) — loaded at boot
-function buildScenario(events = userEvents) {
+function buildScenario(events = userEvents, answers = state.answers) {
   const ov = appSettings.assumptions || {};
-  const out = answersToScenario(state.answers, { today: currentMonth(), convert: (a, from, to) => fx.convert(a, from, to), inflation: ov.inflation, cashRealReturn: ov.cashRealReturn });
+  const out = answersToScenario(answers, { today: currentMonth(), convert: (a, from, to) => fx.convert(a, from, to), inflation: ov.inflation, cashRealReturn: ov.cashRealReturn });
   if (!out.scenario) return { out, s: null, problems: [] };
   const { scenario, problems } = expandEvents({ ...out.scenario, events: [...(out.scenario.events || []), ...events] });
   return { out, s: scenario, problems };
@@ -885,19 +886,116 @@ function openAddLot() {
   } });
 }
 
-// ---------------- scenarios (T2.7 adds duplicate + compare) ----------------
+// ---------------- scenarios: what-ifs + compare (T2.7) ----------------
+// A what-if = your answers with a few changes (kids, stop-work age, retirement spend, investing now) and, optionally,
+// the life events you added. Stored in settings.whatifs (so they're in backups).
+const whatIfs = () => (Array.isArray(appSettings.whatifs) ? appSettings.whatifs : []);
+function summaryFor(answers, events, name) {
+  const { s } = buildScenario(events, answers);
+  if (!s) return null;
+  const res = projectScenario(s);
+  const cs = scenarioCoastStatus(s);
+  const D = dashboardModel(s, res, cs, { tone: settingsFromAnswers(state.answers).tone });
+  return { name, status: D.status, chip: D.chip.label, target: res.target, potAtEnd: res.retirementPot, coastDate: res.coastDate,
+    coasting: cs.isCoasting, depletedAt: res.depletedAt, freeNow: D.free.amount, needToday: D.glide.needToday, retirementAge: s.retirementAge };
+}
+const planSummary = () => summaryFor(state.answers, userEvents, 'Your plan');
+const whatIfSummary = (w) => summaryFor(applyWhatIf(state.answers, w.changes, base()), w.events === 'none' ? [] : userEvents, w.name);
+
 function scenariosHTML() {
-  const P = computePlan();
-  if (!P.scenario) return needAnswersHTML('Scenarios');
-  const { s, res, status } = P;
-  const m = (x) => money(x, s.baseCurrency, { compact: true });
-  const label = P.D.chip.label + (P.cs.isCoasting ? ' · Coasting' : '');
+  const mine = planSummary();
+  if (!mine) return needAnswersHTML('Scenarios');
+  if (screen.compare) {
+    const w = whatIfs().find((x) => x.id === screen.compare);
+    const other = w && whatIfSummary(w);
+    if (other) return compareHTML(mine, other, w);
+  }
+  const m = (x) => money(x, base(), { compact: true });
+  const card = (sum, extra, actions) => `<section class="card scn"><span class="scn-t">${esc(sum.name)}</span><span class="scn-s">${esc(extra)}</span>
+    <span class="scn-k"><span class="chip-s">${esc(sum.chip)}</span><span>Coast ${sum.coasting ? 'now' : sum.coastDate ? monthLabel(sum.coastDate) : '—'}</span><span>Pot at ${sum.retirementAge}: ${sum.potAtEnd < 0 ? 'short' : m(sum.potAtEnd)}</span></span>${actions || ''}</section>`;
   return `<header class="bar"><h1 class="h2">Scenarios</h1></header><div class="wrap">
-    <a class="card scn" href="#plan"><span class="scn-t">Your plan</span><span class="scn-s">Built from your answers</span>
-      <span class="scn-k"><span>${label}</span><span>Target ${m(res.target)}</span><span>${res.coastDate ? 'Coast ' + monthLabel(res.coastDate) : 'No coast date yet'}</span></span></a>
-    <section class="card empty"><h2 class="h3">What-ifs, side by side</h2>
-    <p class="sub">Soon you’ll copy your plan into versions like “two children” or “back to the UK in 2028” and compare them. Until then, change an answer and the plan updates.</p></section>
+    ${card(mine, 'Built from your answers and the events you added', '<a class="link-btn" href="#plan" style="align-self:flex-start;padding-left:0">Open your plan</a>')}
+    ${whatIfs().map((w) => { const sm = whatIfSummary(w); return sm ? card(sm, describeChanges(w.changes, base()) + (w.events === 'none' ? ' · without your added events' : ''),
+      `<div class="scn-act"><button class="btn small primary" data-act="wi-compare" data-val="${esc(w.id)}">Compare with your plan</button><button class="btn small" data-act="wi-edit" data-val="${esc(w.id)}">Edit</button></div>`) : ''; }).join('')}
+    <button class="btn" data-act="wi-new">New what-if</button>
+    <p class="mini">What-ifs change a copy of your plan — your real answers stay as they are.</p>
   </div>`;
+}
+function compareHTML(A, B, w) {
+  const M = compareModel(A, B, { currency: base() });
+  return `<header class="bar"><button class="icon-btn" data-act="wi-back" aria-label="Back to scenarios"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button><h1 class="h2">Compare</h1><span style="width:44px"></span></header>
+    <div class="wrap">
+      <div class="cmp-h"><span class="cmp-a">A · ${esc(M.a)}</span><span class="cmp-b">B · ${esc(M.b)}</span></div>
+      <p class="mini">B: ${esc(describeChanges(w.changes, base()))}${w.events === 'none' ? ', without your added events' : ''}. Everything else is the same as your plan.</p>
+      <section class="card cmp">${M.rows.map((r) => `<div class="cmp-r" data-key="${r.key}"><span class="cmp-l">${esc(r.label)}</span>
+        <span class="cmp-v${r.better === 'a' ? ' win' : ''}">${esc(r.a)}</span><span class="cmp-v${r.better === 'b' ? ' win' : ''}">${esc(r.b)}</span>
+        <span class="cmp-d">${esc(r.delta)}</span></div>`).join('')}</section>
+      <p class="foot">Estimates, not financial advice. All figures in today’s money.</p>
+    </div>`;
+}
+let wiEditing = null; // id or null (new)
+function whatIfFormHTML(w) {
+  const q74 = (state.answers.q74 && state.answers.q74.v) || {};
+  const c = (w && w.changes) || {};
+  const val = (k, fallback) => (Number.isFinite(c[k]) ? c[k] : fallback ?? '');
+  const q63 = state.answers.q63 && state.answers.q63.v, q50 = state.answers.q50 && state.answers.q50.v;
+  return `<div class="sh-top"><h2 class="h2">${w ? 'Edit what-if' : 'New what-if'}</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <p class="sub">Change any of these. Blank means “same as my plan”.</p>
+    <form class="sh-form" data-wi novalidate>
+      <div class="field"><label for="wi-name">Name</label><input class="in" id="wi-name" name="name" value="${esc((w && w.name) || '')}" placeholder="e.g. Two children" autocomplete="off"></div>
+      <div class="field"><label for="wi-kids">Number of kids</label><input class="in" id="wi-kids" name="kids" inputmode="numeric" value="${val('kids')}" placeholder="${Number.isFinite(q74.count) ? q74.count : 'not answered'}" autocomplete="off"></div>
+      <div class="field"><label for="wi-af">Your age at the first child</label><input class="in" id="wi-af" name="ageFirst" inputmode="numeric" value="${val('ageFirst')}" placeholder="${Number.isFinite(q74.ageFirst) ? q74.ageFirst : 'not answered'}" autocomplete="off"></div>
+      <div class="field"><label for="wi-age">Stop work at</label><input class="in" id="wi-age" name="retirementAge" inputmode="numeric" value="${val('retirementAge')}" placeholder="${state.answers.q4 ? state.answers.q4.v : ''}" autocomplete="off"></div>
+      <div class="field"><label for="wi-sp">Retirement spend per year</label><input class="in" id="wi-sp" name="spend" inputmode="decimal" value="${val('spend')}" placeholder="${q63 && Number.isFinite(q63.amount) ? q63.amount : ''}" autocomplete="off"></div>
+      <div class="field"><label for="wi-inv">Investing per month now</label><input class="in" id="wi-inv" name="investNow" inputmode="decimal" value="${val('investNow')}" placeholder="${q50 && q50.now && Number.isFinite(q50.now.amount) ? q50.now.amount : ''}" autocomplete="off"></div>
+      <label class="chk"><input type="checkbox" name="events" ${!w || w.events !== 'none' ? 'checked' : ''}> Include the life events I added</label>
+    </form>
+    <div class="sh-preview" aria-live="polite" data-wi-preview><span class="mini">Change something to see the difference.</span></div>
+    <div class="sh-actions${w ? '' : ' single'}">${w ? '<button class="btn danger" data-wi-act="delete">Delete</button>' : ''}<button class="btn primary" data-wi-act="save">${w ? 'Save' : 'Create'}</button></div>`;
+}
+function readWhatIf() {
+  const f = sheetBody().querySelector('[data-wi]').elements;
+  const n = (k) => { const t = String(f[k].value).replace(/[^0-9.]/g, ''); return t === '' ? undefined : Number(t); };
+  const changes = {};
+  for (const k of ['kids', 'ageFirst', 'retirementAge', 'spend', 'investNow']) { const v = n(k); if (Number.isFinite(v)) changes[k] = v; }
+  return { name: String(f.name.value).trim(), changes, events: f.events.checked ? 'mine' : 'none' };
+}
+function previewWhatIf() {
+  const box = sheetBody() && sheetBody().querySelector('[data-wi-preview]');
+  if (!box) return;
+  const w = readWhatIf();
+  if (Number.isFinite(w.changes.retirementAge) && (w.changes.retirementAge < 30 || w.changes.retirementAge > 80)) { box.innerHTML = '<p class="sh-err">Stop-work age must be 30–80.</p>'; return; }
+  if (Number.isFinite(w.changes.kids) && w.changes.kids > 8) { box.innerHTML = '<p class="sh-err">Up to 8 kids.</p>'; return; }
+  const b = whatIfSummary({ ...w, name: 'B' });
+  const a = planSummary();
+  if (!b) { box.innerHTML = '<span class="mini">Not enough answers to work this out.</span>'; return; }
+  const rows = compareModel(a, b, { currency: base() }).rows.filter((r) => ['status', 'coast', 'pot'].includes(r.key));
+  box.innerHTML = `<span class="lab">Compared with your plan</span><ul class="bul">${rows.map((r) => `<li>${esc(r.label)}: ${esc(r.a)} → ${esc(r.b)}</li>`).join('')}</ul>`;
+}
+function openWhatIf(id) {
+  wiEditing = id || null;
+  const w = id ? whatIfs().find((x) => x.id === id) : null;
+  openSheet({ label: w ? 'Edit what-if' : 'New what-if', html: whatIfFormHTML(w), onInput: previewWhatIf,
+    onClick: async (e) => {
+      const b = e.target.closest('[data-wi-act]');
+      if (!b) return;
+      e.preventDefault();
+      let list = whatIfs();
+      if (b.dataset.wiAct === 'delete') {
+        if (!b.dataset.confirm) { b.dataset.confirm = '1'; b.textContent = 'Tap to confirm'; return; }
+        list = list.filter((x) => x.id !== wiEditing);
+      } else {
+        const w2 = readWhatIf();
+        if (!w2.name) w2.name = describeChanges(w2.changes, base()).replace(/^./, (c) => c.toUpperCase());
+        if (wiEditing) list = list.map((x) => (x.id === wiEditing ? { ...x, ...w2 } : x));
+        else list = [...list, { id: newEventId(list).replace('ev-', 'wi-'), ...w2 }];
+      }
+      appSettings = await data.saveSettings({ whatifs: list });
+      closeSheet();
+      render('none', { keepScroll: true });
+      toast(b.dataset.wiAct === 'delete' ? 'What-if deleted' : 'What-if saved');
+    } });
+  if (w) previewWhatIf();
 }
 
 // ---------------- settings (T2.8 adds currencies, assumptions, full backup) ----------------
@@ -1105,6 +1203,10 @@ app.addEventListener('click', (e) => {
     data.removeBudget().catch(() => {});
     return render('back');
   }
+  if (act === 'wi-new') return openWhatIf(null);
+  if (act === 'wi-edit') return openWhatIf(val);
+  if (act === 'wi-compare') { screen = { name: 'scenarios', compare: val }; return render('fwd'); }
+  if (act === 'wi-back') { screen = { name: 'scenarios' }; return render('back'); }
   if (act === 'ev-add') return openEventEditor(null);
   if (act === 'ev-edit') return openEventEditor(val);
   if (act === 'tl-step') {
