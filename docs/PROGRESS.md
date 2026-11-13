@@ -39,3 +39,14 @@ export/import, clearAll) and `createLocalStore` (localStorage, every access try/
 mode), null storage, corrupt JSON in each key, copy-on-read, persistence across instances, snapshot upsert/sort, export→clear→import,
 bad backups rejected with readable errors and nothing written. `npm run check` → 52/52.
 **Needs Harvey's eyes:** nothing (no UI yet).
+
+## 2026-11-13 T0.4 — Seed loader (dev only)
+**Changed:** `scripts/seed-lib.mjs` (pure `seedToAnswers`), `scripts/seed.mjs` + `npm run seed` → writes
+`data/seed.import.local.json` (gitignored), an answers backup the app imports via "Restore answers from a backup".
+Only **confirmed** facts are imported; unconfirmed pots and the placeholder assumptions are listed as skipped (names only,
+never values) so onboarding asks for them. `build-site.sh` takes an optional output dir and refuses to stage any `data/`,
+`seed*.json` or `*.local.json`.
+**Verified:** `tests/seed.test.js` (5): confirmed-only mapping, invalid birth/age ignored, output accepted by the app's
+`importAnswers`, and a real `build-site.sh` run into a temp dir contains no data/docs/tests/scripts/local JSON.
+`npm run seed` against the real seed: 2 answers (base currency, course start Sep 2027); ISA, super, birth, retirement age skipped.
+**Needs Harvey's eyes:** your seed file marks the ISA and super balances `confirmed:false` — confirm them in onboarding (q49).
