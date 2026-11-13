@@ -52,14 +52,14 @@ for (const scheme of ['light', 'dark']) {
   });
 }
 
-test('start over from Settings returns to onboarding and hides the tab bar', async ({ page }) => {
+test('delete all my data from Settings returns to onboarding and hides the tab bar', async ({ page }) => {
   await prepare(page);
   await fresh(page);
   await seedFinished(page);
   await page.goto('/#settings');
   await page.reload(); // '/' → '/#settings' is only a hash change; reload so the seeded answers are read
-  await page.getByRole('button', { name: 'Start over' }).click();
-  await page.getByRole('button', { name: 'Tap again to delete all answers' }).click();
+  await page.getByRole('button', { name: 'Delete all my data' }).click();
+  await page.getByRole('button', { name: /Tap again — this deletes everything/ }).click();
   await expect(page.getByRole('heading', { name: /build your plan/i })).toBeVisible();
   await expect(page.locator('#tabbar')).toBeHidden();
   expect(page.url()).not.toContain('#');

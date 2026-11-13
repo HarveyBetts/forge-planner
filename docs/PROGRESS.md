@@ -356,3 +356,9 @@ coasting / never-coasting / running-out / shortfall wording. `tests/e2e/compare.
 live preview, compare shows a lower pot (A ticked), same target, more needed today; real answers still 1 child; edit pre-filled;
 delete. Screenshot `artifacts/compare-1-vs-2-children.png`. `npm run check` → 210/210.
 **Needs Harvey's eyes:** whether the compare rows are the ones you care about.
+
+## 2026-11-13 — Fix: e2e test left behind by T2.8
+T2.8 renamed Settings' "Start over" to "Delete all my data" but `tests/e2e/shell.spec.js` still clicked "Start over", so CI's e2e job
+failed on the T2.8 and T2.7 pushes (the site kept deploying — Pages only gates on `npm run check`). Test updated; full e2e suite
+30/30 locally. Process fix: the local commit script now runs the whole Playwright suite before every commit, not just unit tests.
+
