@@ -110,3 +110,14 @@ required return on track while −0.1% isn't and matches the analytic rate, reti
 earlier fails), unreachable → null, whatMustBeTrue never yields NaN, events are seen by solvers. e2e asserts the card has 4
 rows and no NaN/null/undefined; screenshot `artifacts/plan-levers.png`. `npm run check` → 106/106.
 **Needs Harvey's eyes:** the levers card wording and layout.
+
+## 2026-11-13 T1.5 — Real ⇄ nominal display helpers
+**Changed:** `src/engine/inflation.js` — `inflationFactor`, `toNominal`, `toReal`, `forDisplay(amount, at, mode)`,
+`rowsForDisplay(rows, mode)` (money fields only; engine rows are end-of-month so they get one extra month of inflation),
+`modeLabel` ("today’s money" / "future money (with inflation)"). Display-only: the engine stays in today's money (D4).
+The toggle itself lands with Settings (T2.8) / answer-driven settings (T2.2c).
+**Verified:** `tests/inflation.test.js` (6): factor at start / +1y / +10y / half-year / past, round-trips, the Instagram
+$4.3M-in-26-years ≈ $2.26M today at 2.5%, identity for real mode, unknown mode throws, rows inflated per date with the
+input untouched and nominal growth equal to the nominal return (caught and fixed an off-by-one-month in the first draft).
+`npm run check` → 112/112.
+**Needs Harvey's eyes:** nothing (no UI yet).

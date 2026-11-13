@@ -16,7 +16,7 @@ Phases 0–3 need nothing from Harvey except a GitHub repo to push to. Everythin
 - [x] **T1.2** Multi-pot model: pots with `currency`, `kind` (`invested|cash|pension|super`), `accessAge`, contribution rules; convert to base currency via FX; engine reports invested vs locked-until-age. Do NOT hardcode UK/AU pension access ages from memory — research, cite the source in DECISIONS.md, make editable. Accept: tests incl. a locked pot that cannot fund pre-access-age drawdown.
 - [x] **T1.3** Life-event library `src/engine/events.js`: pure `applyEvent(scenario, event)` for templates — `speedbirdPathway` (course start, 18-month training, reduced scale N years, then main scale; **salary figures come from user input, never invented**), `child` (running cost curve; optional school fees from age X to Y), `houseDeposit`, `holiday` (recurring N/yr), `car`, `oneOffTrip`, `relocation` (currency + cost-of-living switch). Accept: each template has tests asserting exact cash-flow months.
 - [x] **T1.4** Required-contribution + "what must be true" helpers (build on `solveMonthlyContribution`): required return, required retirement age, required spend cut. Accept: bisection tests; unreachable → `null` handled in UI contract.
-- [ ] **T1.5** Real-vs-nominal toggle helpers + inflation display conversion. Accept: tests.
+- [x] **T1.5** Real-vs-nominal toggle helpers + inflation display conversion. Accept: tests.
 - [ ] **T1.6** Glide path: ideal pot-by-date line from today to target; `trackStatus(actual, glide)` → `ahead|on-track|behind` with tolerance. Accept: tests incl. boundary cases.
 - [ ] **T1.7** Scenario JSON schema validation (`docs/SPEC.md`), versioned, with migration stub. Accept: invalid inputs produce readable errors.
 
