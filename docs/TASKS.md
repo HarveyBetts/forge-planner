@@ -51,7 +51,7 @@ Harvey's own spreadsheet (budget + investments) defines this phase — see D23. 
 - [ ] **T2.2f** (Phase 4) Sync onboarding answers to Supabase `onboarding_answers`; add the Supabase origin to the CSP `connect-src`. Accept: mocked sync tests.
 - [x] **T4.1** `SupabaseStore` implementing the T0.3 interface; config via a gitignored `config.local.js` / documented public config. Mock client for tests. Accept: contract tests run against both stores.
 - [ ] **T4.2** Auth UI (magic link or email+password), session handling, sign-out, delete-account flow. Accept: mocked-auth e2e.
-- [ ] **T4.3** Sync policy: local-first; push on change; per-scenario last-write-wins on `updated_at`; conflict toast. Accept: tests for offline edits then reconnect.
+- [x] **T4.3** Sync policy: local-first; push on change; per-scenario last-write-wins on `updated_at`; conflict toast. Accept: tests for offline edits then reconnect.
 - [ ] **T4.4** RLS verification script (`supabase/tests/rls.sql` + doc): two users cannot see/modify each other's rows; anon sees nothing. Accept: documented queries + expected results; mark `[~]` until Harvey runs it against the real project.
 
 ## Phase 5 — AI planner

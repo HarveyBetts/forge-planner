@@ -501,3 +501,16 @@ policy. HUMAN_TODO H3 rewritten step by step; SECURITY checklist: no service-rol
 rows and anon getting nothing, refresh, delete account) and `tests/store-contract.test.js` — **the same contract run against
 LocalStore and SupabaseStore** (empty, scenarios, snapshots, settings/budget, export → clear → import). `npm run check` → 244/244.
 **Needs Harvey's eyes:** nothing until you decide to do H3 (only needed for more than one device).
+
+## 2026-11-13 T4.3 — Sync policy (local-first, last write wins)
+**Changed:** `src/data/sync.js` — pure `reconcile(local, remote, meta, prefer)` → push / pull / same / conflicts / needsChoice, and
+`createSync({ sb, storage })`: local changes found by fingerprinting each stored document (so every writer is covered without
+hooks), their edit time recorded when first noticed (`noteLocal`); remote changes found by `updated_at`; both changed → the later
+edit wins and the conflict is reported ("kept this device" / "kept other device"); a deleted budget travels as a tombstone; errors
+(offline) leave everything queued and are reported in `status.error`; first sync on a device that already has *different* data from
+the cloud returns `needsChoice` and changes nothing until the caller picks "cloud copy" or "this phone's copy".
+**Verified:** `tests/sync.test.js` (7): fingerprints; reconcile cases incl. identical content, conflicts both ways, first-sync choice,
+fresh device just pulls; **two devices against the mock** — A's events and budget reach B, a deletion travels, nothing moves when
+nothing changed; **offline edits then reconnect** (error reported, then uploaded, then visible on B); concurrent edits → later wins and
+both converge; first sign-in asks and leaves local data untouched until chosen; signed-out does nothing. `npm run check` → 251/251.
+**Needs Harvey's eyes:** nothing yet (the Sync & account screen is T4.2).
