@@ -1,0 +1,20 @@
+{
+  "name": "forge",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Forge \u2014 personal financial planner and life-timeline app (vanilla ES modules, no build step)",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "lint:syntax": "node scripts/check-syntax.mjs",
+    "check": "npm run lint:syntax && npm test",
+    "serve": "node scripts/serve.mjs",
+    "build:site": "bash scripts/build-site.sh",
+    "auto": "bash scripts/run-autonomous.sh",
+    "docs:questions": "node scripts/gen-questions-doc.mjs",
+    "test:walk": "node tests/e2e/onboarding.walk.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

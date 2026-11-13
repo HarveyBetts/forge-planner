@@ -1,0 +1,31 @@
+{
+  "_README": "Sanitised template. Copy to data/seed.local.json (gitignored) and fill in. Never commit personal numbers.",
+  "baseCurrency": "GBP",
+  "secondaryCurrency": "AUD",
+  "birth": null,
+  "retirementAge": null,
+  "openingPots": [
+    {
+      "id": "example-pot",
+      "name": "Example pot",
+      "currency": "GBP",
+      "balance": 0,
+      "confirmed": false
+    }
+  ],
+  "timeline": [
+    {
+      "id": "example-event",
+      "name": "Example event",
+      "date": "2030-01",
+      "confirmed": false
+    }
+  ],
+  "assumptions": {
+    "nominalReturn": 0.07,
+    "inflation": 0.025,
+    "withdrawalRate": 0.04,
+    "retirementSpend": null,
+    "otherRetirementIncome": null
+  }
+}

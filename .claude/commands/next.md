@@ -1,0 +1,1 @@
+Do the next open task in docs/TASKS.md following the "Autonomy protocol" in CLAUDE.md: implement, run `npm run check`, tick the task, log in docs/PROGRESS.md, commit and push. Don't ask me questions — log blockers in docs/HUMAN_TODO.md and move on. $ARGUMENTS

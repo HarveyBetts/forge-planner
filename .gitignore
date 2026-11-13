@@ -1,0 +1,9 @@
+node_modules/
+logs/
+artifacts/
+_site/
+.env
+.env.*
+*.local.json
+data/seed.local.json
+.DS_Store
