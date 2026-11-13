@@ -215,3 +215,19 @@ UI: “Paste answers from the intake doc” on Welcome and Your answers → past
 without confirmation), then Save stores exactly the 5 readable answers. Screenshot `artifacts/paste-preview.png`.
 `npm run check` → 164/164; e2e 13/13.
 **Needs Harvey's eyes:** try pasting your real intake-doc answers — anything it can't read is listed with the reason.
+
+## 2026-11-13 T2.3 — Plan dashboard
+**Changed:** `src/ui/dashboard.js` — pure `dashboardModel`: status chip from **today's pot vs the glide path** (Ahead / On track
+/ Behind, ±5%; "Runs short" wins if savings run out), tone-aware message, ring = pot ÷ coast number capped at 100% with a
+**Coasting · +£X surplus** state, **free money this month** (un-invested share + planned investing once coasting; never double
+counts redirect-after-coast). Plan screen: "Today’s money · 2.5% inflation assumed" label, ring colour follows status
+(green / blue / amber — always with icon + word), "£X needed today to stay on plan", Free money card (green when there's some),
+Target + Coast date KPIs, **Assumptions disclosure** (collapsible, count badge, "estimate" tags), count-up of the ring % and free
+money in step with the ring fill — **first Plan view per session only**, none under reduced motion. Scenarios card uses the
+same status. New `--warn` token (#F59E0B) for the amber ring.
+**Verified:** `tests/dashboard.test.js` (5): on-track inside ±5% (both edges), ahead/behind beyond it, blunt tone, runs-short
+priority, ring cap + coasting surplus, free money (coasting, investShare 80%, none, redirect). `tests/e2e/dashboard.spec.js`
+(5): Ahead / On track (pot computed with the same engine) / Behind / Coasting — chip, label, ring %, free money, disclosure opens,
+no overflow; count-up once per session and not at all under reduced motion. Screenshots `artifacts/dashboard-{ahead,on-track,
+behind,coasting}.png`. `npm run check` → 169/169; e2e 18/18.
+**Needs Harvey's eyes:** ring fill + count-up timing on the phone; whether "£X needed today to stay on plan" is clear.

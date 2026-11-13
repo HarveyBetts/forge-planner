@@ -15,6 +15,7 @@ import { milestones } from './ui/milestones.js';
 import { settingsFromAnswers, behindCopy, applyTheme, LABELS } from './ui/settings.js';
 import { planSnapshot, diffSnapshots } from './ui/whatchanged.js';
 import { parsePastedAnswers, entriesToAnswers } from './onboarding/paste.js';
+import { dashboardModel } from './ui/dashboard.js';
 import {
   projectScenario, projectFan, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -313,46 +314,47 @@ function computePlan() {
   const cs = scenarioCoastStatus(s);
   const fan = projectFan(s, [0.04, 0.07, 0.09]);
   const levers = res.onTrack ? null : whatMustBeTrue(s);
-  const inv = (s.items.find((i) => i.id === 'investing') || {}).steps || [];
-  const investingNow = inv.length ? inv.filter((st) => ym(st.from) <= ym(today)).pop()?.monthly || 0 : 0;
-  const status = res.depletedAt ? 'short' : cs.isCoasting ? 'coasting' : res.onTrack ? 'on-track' : 'behind';
-  return { ...out, today, s, res, cs, fan, levers, investingNow, status };
+  const D = dashboardModel(s, res, cs, { tone: settingsFromAnswers(state.answers).tone });
+  return { ...out, today, s, res, cs, fan, levers, D, status: D.status };
 }
+
+const CHIP_ICON = {
+  up: '<path d="M5 15l5-5 4 4 5-6"/><path d="M15 8h4v4"/>',
+  check: '<path d="M6 12.5l4 4 8-9"/>',
+  alert: '<path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/>',
+};
+let planAnimated = false; // count-up + ring fill on the first Plan view of a session only (DESIGN: first load)
 
 function planHTML() {
   const P = computePlan();
   if (!P.scenario) return reviewHTML();
-  const { s, res, cs, fan, levers, status } = P;
+  const { s, res, cs, fan, levers, D } = P;
   const cur = s.baseCurrency;
-  const tone = settingsFromAnswers(state.answers).tone;
   const m = (x, c) => money(x, cur, { compact: c });
-  const chip = {
-    coasting: ['ok', 'Coasting', 'Your pot would reach the target with no more investing.'],
-    'on-track': ['info', 'On track', 'On current plans you reach your target by ' + s.retirementAge + '.'],
-    behind: ['warn', 'Behind', behindCopy(tone, 'behind')],
-    short: ['warn', 'Runs short', behindCopy(tone, 'short', { depletedLabel: monthLabel(res.depletedAt) })],
-  }[status];
-  const icon = status === 'behind' || status === 'short'
-    ? '<path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/>'
-    : '<path d="M6 12.5l4 4 8-9"/>';
-  const free = cs.isCoasting
-    ? `<span class="big">${m(P.investingNow)}</span><span class="mini">a month you no longer need to invest</span>`
-    : `<span class="big">${res.coastDate ? monthLabel(res.coastDate) : 'Not yet'}</span><span class="mini">${res.coastDate ? 'when your investing becomes optional' : 'Coast isn’t reached before retirement on these numbers'}</span>`;
+  const animate = !quiet && !planAnimated;
   const events = [
     ...s.oneOffs.map((o) => ({ at: o.at, name: o.name, amt: o.amount })),
     ...s.items.filter((i) => i.kind === 'expense' && i.from).map((i) => ({ at: i.from, name: i.name, amt: -(i.annual ?? (i.monthly || 0) * 12), per: '/yr' })),
   ].sort((a, b) => ym(a.at) - ym(b.at));
+  const assumptions = [...P.assumptions, `Amounts in other currencies converted at mid-market rates (${fxBadge(fx)}).`];
+  const ringLabel = D.ring.coasting ? `Coasting · +${m(D.ring.surplus, true)} surplus` : D.ring.label;
   return `<header class="bar"><h1 class="h2">Your plan</h1><button class="btn small" data-act="review">Edit answers</button></header>
     <div class="wrap">
-      <section class="card hero">
-        ${ring(Math.min(1, cs.progress), `${Math.min(999, Math.round(cs.progress * 100))}%`, 'of your coast number', !quiet)}
-        <p class="chip ${chip[0]}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg>${chip[1]}</p>
-        <p class="sub">${chip[2]}</p>
-        <p class="mini">${m(s.openingPot)} saved now · ${m(cs.coastNumber)} needed to coast</p>
+      <p class="tm"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Today’s money · ${pct(s.assumptions.inflation)} inflation assumed</p>
+      <section class="card hero" data-status="${D.status}">
+        ${ring(D.ring.ratio, `${D.ring.pct}%`, ringLabel, animate, D.ring.pct)}
+        <p class="chip ${D.chip.kind}" data-chip="${D.status}"><svg viewBox="0 0 24 24" aria-hidden="true">${CHIP_ICON[D.chip.icon]}</svg>${D.chip.label}</p>
+        <p class="sub">${esc(D.message)}</p>
+        <p class="mini">${m(s.openingPot)} saved now · ${D.glide.needToday > 0 ? `${m(D.glide.needToday)} needed today to stay on plan` : 'your future saving covers the target'}</p>
+      </section>
+      <section class="card free ${D.free.amount > 0 ? 'has' : ''}">
+        <span class="lab">Free money this month</span>
+        <span class="big"${animate && D.free.amount > 0 ? ` data-count="${Math.round(D.free.amount)}" data-cur="${cur}"` : ''}>${m(D.free.amount)}</span>
+        <span class="mini">${esc(D.free.note)}</span>
       </section>
       <div class="grid2">
-        <section class="card kpi"><span class="lab">Target pot at ${s.retirementAge}</span><span class="big">${m(res.target, true)}</span><span class="mini">pays ${m(s.assumptions.retirementSpend)}/yr at ${(s.assumptions.withdrawalRate * 100).toFixed(1).replace('.0', '')}%</span></section>
-        <section class="card kpi"><span class="lab">${cs.isCoasting ? 'Free money' : 'Coast date'}</span>${free}</section>
+        <section class="card kpi"><span class="lab">Target pot at ${s.retirementAge}</span><span class="big">${m(res.target, true)}</span><span class="mini">pays ${m(s.assumptions.retirementSpend)}/yr at ${pct(s.assumptions.withdrawalRate)}</span></section>
+        <section class="card kpi"><span class="lab">Coast date</span><span class="big">${cs.isCoasting ? 'Now' : res.coastDate ? monthLabel(res.coastDate) : 'Not yet'}</span><span class="mini">${cs.isCoasting ? 'investing is already optional' : res.coastDate ? 'when investing becomes optional' : 'not reached before you stop work'}</span></section>
       </div>
       <section class="card">
         <span class="lab">At ${s.retirementAge} you’d have, in today’s money</span>
@@ -364,7 +366,9 @@ function planHTML() {
       ${events.length ? `<section class="card"><h2 class="rv-h">Life events in your plan</h2><ul class="ev">${events.map((e) =>
         `<li><span class="ev-d">${monthLabel(e.at)}</span><span class="ev-n">${esc(e.name)}</span><span class="ev-a ${e.amt < 0 ? 'neg' : ''}">${money(e.amt, cur, { compact: true })}${e.per || ''}</span></li>`).join('')}</ul></section>` : ''}
       ${P.notPlaced.length ? `<section class="card"><h2 class="rv-h">Not in the plan yet</h2><ul class="bul">${P.notPlaced.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></section>` : ''}
-      <section class="card"><h2 class="rv-h">Assumptions</h2><ul class="bul">${P.assumptions.map((t) => `<li>${esc(t)}</li>`).join('')}<li>Amounts in other currencies converted at mid-market rates (${esc(fxBadge(fx))}).</li></ul></section>
+      <details class="card disc"><summary><span class="rv-h">Assumptions</span><span class="disc-n">${assumptions.length}</span><svg class="disc-c" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10l4 4 4-4"/></svg></summary>
+        <div class="disc-b"><ul class="bul">${assumptions.map((t) => `<li>${esc(t)}${/estimate/i.test(t) ? ' <span class="tag">estimate</span>' : ''}</li>`).join('')}</ul>
+        <p class="mini">Change any of these by editing your answers.</p></div></details>
       <p class="foot">Estimates, not financial advice. All figures in today’s money.</p>
     </div>`;
 }
@@ -396,21 +400,38 @@ function rangeHTML(fan, m) {
     `<span class="mini">Middle case ${mid < 0 ? `short by ${m(-mid, true)}` : m(mid, true)}. Range uses 4%, 7% and 9% returns before inflation.</span>`;
 }
 
-function ring(ratio, big, label, animate = false) {
+function ring(ratio, big, label, animate = false, countTo = null) {
   const r = 52;
   const c = 2 * Math.PI * r;
   const off = c * (1 - Math.max(0, Math.min(1, ratio)));
   return `<div class="ring" role="img" aria-label="${esc(big)} ${esc(label)}">
     <svg viewBox="0 0 128 128" aria-hidden="true"><circle cx="64" cy="64" r="${r}" class="ring-bg"/>
     <circle cx="64" cy="64" r="${r}" class="ring-fg" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${animate ? c.toFixed(2) : off.toFixed(2)}" data-off="${off.toFixed(2)}" transform="rotate(-90 64 64)"/></svg>
-    <span class="ring-big">${esc(big)}</span><span class="ring-lab">${esc(label)}</span></div>`;
+    <span class="ring-big"${animate && countTo != null ? ` data-count="${countTo}" data-suffix="%"` : ''}>${esc(big)}</span><span class="ring-lab">${esc(label)}</span></div>`;
 }
 function animatePlan(root) {
   const fg = root.querySelector('.ring-fg[data-off]');
   if (!fg) return;
-  if (reduceMotion()) { fg.style.strokeDashoffset = fg.dataset.off; return; }
+  const counters = [...root.querySelectorAll('[data-count]')];
+  if (reduceMotion() || planAnimated) {
+    fg.style.strokeDashoffset = fg.dataset.off;
+    planAnimated = true;
+    return;
+  }
+  planAnimated = true;
   void fg.getBoundingClientRect(); // flush so the transition runs (iOS skips same-frame changes)
   requestAnimationFrame(() => { fg.style.strokeDashoffset = fg.dataset.off; });
+  // Count-up in step with the ring (1.2s, same ease-out feel as --e-out).
+  const t0 = performance.now(), dur = 1200;
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
+  const fmt = (el, v) => (el.dataset.cur ? money(v, el.dataset.cur) : `${Math.round(v)}${el.dataset.suffix || ''}`);
+  counters.forEach((el) => { el.textContent = fmt(el, 0); });
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / dur);
+    counters.forEach((el) => { if (el.isConnected) el.textContent = fmt(el, Number(el.dataset.count) * ease(t)); });
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 // Pot (middle case) vs coast number, yearly, as a small SVG line chart.
@@ -475,7 +496,7 @@ function scenariosHTML() {
   if (!P.scenario) return needAnswersHTML('Scenarios');
   const { s, res, status } = P;
   const m = (x) => money(x, s.baseCurrency, { compact: true });
-  const label = { coasting: 'Coasting', 'on-track': 'On track', behind: 'Behind', short: 'Runs short' }[status];
+  const label = P.D.chip.label + (P.cs.isCoasting ? ' · Coasting' : '');
   return `<header class="bar"><h1 class="h2">Scenarios</h1></header><div class="wrap">
     <a class="card scn" href="#plan"><span class="scn-t">Your plan</span><span class="scn-s">Built from your answers</span>
       <span class="scn-k"><span>${label}</span><span>Target ${m(res.target)}</span><span>${res.coastDate ? 'Coast ' + monthLabel(res.coastDate) : 'No coast date yet'}</span></span></a>

@@ -53,3 +53,11 @@ export async function seedFinished(page, extra = {}) {
   }, { ...SAMPLE, ...extra });
 }
 
+
+// Seed raw answers ({ q1: { v: ... } }) as a finished onboarding.
+export async function seedAnswers(page, answers) {
+  await page.evaluate((answers) => {
+    localStorage.setItem('forge.onboarding.v1', JSON.stringify({ v: 1, mode: 'quick', answers, pos: null,
+      startedAt: '2026-11-13T00:00:00Z', updatedAt: '2026-11-13T00:00:00Z', completedAt: '2026-11-13T00:00:00Z' }));
+  }, answers);
+}

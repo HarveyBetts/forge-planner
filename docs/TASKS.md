@@ -28,7 +28,7 @@ Phases 0–3 need nothing from Harvey except a GitHub repo to push to. Everythin
 - [x] **T2.2c** Answers drive settings: theme q136, "behind" tone q134, budget style/period q43/q44/q27, notifications q133, overspend flags q47. Accept: tests + screenshots.
 - [x] **T2.2d** "What changed" summary after editing an answer (e.g. "Coast date moved from Mar 2031 to Feb 2034"). Accept: unit test on the diff + screenshot.
 - [x] **T2.2e** Paste-in import of numbered answers typed in the Forge intake doc → parsed preview → confirm. Accept: parser tests incl. messy input; nothing saved without confirmation.
-- [ ] **T2.3** Dashboard (a first version exists: the Plan screen in `src/app.js` → polish it into the full design): animated progress ring (pot vs coast number), status chip (ahead/on-track/behind), "free money this month" card, assumptions disclosure, real-terms label. Accept: screenshots for all three states.
+- [x] **T2.3** Dashboard (a first version exists: the Plan screen in `src/app.js` → polish it into the full design): animated progress ring (pot vs coast number), status chip (ahead/on-track/behind), "free money this month" card, assumptions disclosure, real-terms label. Accept: screenshots for all three states.
 - [ ] **T2.4** Projection chart (SVG, no libs): low/mid/high fan, glide path, actuals overlay, coast date marker. Accept: renders for edge cases (never coasts, already coasting).
 - [ ] **T2.5** Life timeline: horizontal scrub through years with animated life-stage markers (training, FO start, kids, house…). Accept: scrubbing updates pot/age readout; works with keyboard.
 - [ ] **T2.6** Event editor sheet (Apple-style bottom sheet, drag-to-dismiss, ≥16px inputs) for the T1.3 templates. Accept: add/edit/delete event updates projection live.
