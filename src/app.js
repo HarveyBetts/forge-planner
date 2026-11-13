@@ -17,6 +17,7 @@ import { planSnapshot, diffSnapshots } from './ui/whatchanged.js';
 import { parsePastedAnswers, entriesToAnswers } from './onboarding/paste.js';
 import { dashboardModel } from './ui/dashboard.js';
 import { chartModel, chartSVG, readoutAt } from './ui/chart.js';
+import { timelineModel, readoutText, nextStop } from './ui/timeline.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -65,6 +66,7 @@ function render(dir = 'fwd', opts = {}) {
   if (!opts.keepScroll) window.scrollTo(0, 0);
   if (screen.name === 'question') focusFirst(main);
   if (screen.name === 'plan' && !quiet) animatePlan(main);
+  if (screen.name === 'timeline') scrubTo(0, main);
 }
 window.addEventListener('hashchange', () => {
   const r = parseRoute(location.hash);
@@ -474,10 +476,23 @@ function timelineHTML() {
   if (!P.scenario) return needAnswersHTML('Timeline');
   const cur = P.s.baseCurrency;
   const list = milestones(P.s, P.res);
+  tlModel = timelineModel(P.s, P.res, list);
+  const M = tlModel;
+  const startI = ym(P.s.start);
   return `<header class="bar"><h1 class="h2">Timeline</h1></header>
     <div class="wrap">
-      <p class="sub">Your life stages and big moments, with your projected pot at each (middle case, today’s money).</p>
-      <ol class="tl">${list.map((m) => `<li class="tl-i k-${m.kind}${m.warn ? ' warn' : ''}${m.after ? ' after' : ''}">
+      <section class="card scrub" data-scrub>
+        <div class="sc-read" aria-hidden="true">${scrubReadHTML(M.at(0))}</div>
+        <div class="sc-track">
+          <div class="sc-rail"><div class="sc-fill"></div></div>
+          ${M.stops.map((m) => `<span class="sc-mk k-${m.kind}${m.warn ? ' warn' : ''}" style="left:calc(14px + (100% - 28px) * ${(m.i / Math.max(1, M.n)).toFixed(4)})" data-val="${m.i}" data-label="${esc(m.label)}" aria-hidden="true"></span>`).join('')}
+          <input class="sc-range" type="range" min="0" max="${M.n}" step="1" value="0" aria-label="Scrub through your timeline" aria-valuetext="${esc(readoutText(M.at(0), cur))}">
+        </div>
+        <div class="sc-ends"><span>Today</span><span>Age ${P.s.retirementAge}</span></div>
+        <div class="sc-jump"><button class="btn small" data-act="tl-step" data-val="-1" aria-label="Previous moment">‹ Previous</button><button class="btn small" data-act="tl-step" data-val="1" aria-label="Next moment">Next ›</button></div>
+      </section>
+      <p class="sub">Drag through the years, or tap a dot. Projected pot is the middle case in today’s money.</p>
+      <ol class="tl">${list.map((m) => `<li class="tl-i k-${m.kind}${m.warn ? ' warn' : ''}${m.after ? ' after' : ''}" data-i="${ym(m.at) - startI}">
         <span class="tl-dot" aria-hidden="true"></span>
         <div class="tl-b"><span class="tl-d">${monthLabel(m.at)} · age ${Math.floor(m.age)}</span>
         <span class="tl-l">${esc(m.label)}</span>
@@ -485,6 +500,62 @@ function timelineHTML() {
       <p class="foot">Estimates, not financial advice. All figures in today’s money.</p>
     </div>`;
 }
+
+// Scrubber behaviour: readout updates in place (no re-render); jumps spring-ease unless reduced motion.
+let tlModel = null;
+let tlAnim = 0;
+let tlTarget = null; // where a running spring is heading (so rapid taps step from the destination, not the overshoot)
+function scrubReadHTML(r) {
+  const cur = tlModel ? tlModel.currency : 'GBP';
+  const pot = r.pot < 0 ? `short by ${money(-r.pot, cur, { compact: true })}` : money(r.pot, cur, { compact: true });
+  const here = r.here.filter((h) => h.kind !== 'today').map((h) => esc(h.label)).join(' · ');
+  return `<span class="sc-date">${monthLabel(r.ym)} · age ${Math.floor(r.age)}</span>
+    <span class="sc-pot${r.pot < 0 ? ' neg' : ''}">${pot}</span>
+    <span class="sc-stage">${esc(r.stage)}</span>
+    <span class="sc-here">${here || (r.flow ? `${r.flow > 0 ? '+' : ''}${money(r.flow, cur)} this month` : '&nbsp;')}</span>`;
+}
+function scrubTo(i, root = app) {
+  const box = root.querySelector('[data-scrub]');
+  if (!box || !tlModel) return;
+  const r = tlModel.at(i);
+  const range = box.querySelector('.sc-range');
+  if (Number(range.value) !== Math.round(i)) range.value = String(Math.round(i));
+  range.setAttribute('aria-valuetext', readoutText(r, tlModel.currency));
+  box.querySelector('.sc-read').innerHTML = scrubReadHTML(r);
+  box.querySelector('.sc-fill').style.width = `calc(14px + (100% - 28px) * ${(i / Math.max(1, tlModel.n)).toFixed(4)})`;
+  box.querySelectorAll('.sc-mk').forEach((mk) => mk.classList.toggle('on', Number(mk.dataset.val) <= r.i));
+  let cur = null;
+  app.querySelectorAll('.tl-i[data-i]').forEach((li) => { const k = Number(li.dataset.i); if (k <= r.i) cur = li; li.classList.remove('cur'); });
+  if (cur) cur.classList.add('cur');
+}
+function scrubAnimate(target) {
+  const range = app.querySelector('.sc-range');
+  if (!range) return;
+  cancelAnimationFrame(tlAnim);
+  const from = Number(range.value);
+  tlTarget = null;
+  if (reduceMotion() || from === target) return scrubTo(target);
+  tlTarget = target;
+  const t0 = performance.now(), dur = 520;
+  // Spring-like ease-out with a hint of overshoot (matches --e-spring), clamped to the track.
+  const ease = (t) => { const c1 = 1.2, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / dur);
+    const v = Math.max(0, Math.min(tlModel.n, from + (target - from) * ease(t)));
+    scrubTo(t < 1 ? v : target);
+    if (t < 1) tlAnim = requestAnimationFrame(step); else tlTarget = null;
+  };
+  tlAnim = requestAnimationFrame(step);
+}
+app.addEventListener('input', (e) => { if (e.target.matches && e.target.matches('.sc-range')) { cancelAnimationFrame(tlAnim); tlTarget = null; scrubTo(Number(e.target.value)); } });
+// Let go within 4 months of a moment → snap onto it (markers are visual; the slider takes every touch).
+const SNAP_MONTHS = 4;
+app.addEventListener('change', (e) => {
+  if (!(e.target.matches && e.target.matches('.sc-range')) || !tlModel) return;
+  const v = Number(e.target.value);
+  const near = tlModel.stops.reduce((b, m) => (Math.abs(m.i - v) < Math.abs(b - v) ? m.i : b), Infinity);
+  if (Math.abs(near - v) <= SNAP_MONTHS && near !== v) scrubAnimate(near);
+});
 
 // ---------------- budget (Phase 3) ----------------
 function budgetHTML() {
@@ -623,6 +694,11 @@ app.addEventListener('click', (e) => {
     if (screen.returnTo) return go({ name: screen.returnTo }, 'back');
     const p = prevQuestion(state.answers, state.mode, screen.id);
     return p ? go({ name: 'question', id: p.id }, 'back') : go({ name: 'welcome' }, 'back');
+  }
+  if (act === 'tl-step') {
+    const r = app.querySelector('.sc-range');
+    const nx = tlModel && r ? nextStop(tlModel, tlTarget ?? Number(r.value), Number(val)) : null;
+    return nx == null ? undefined : scrubAnimate(nx);
   }
   if (act === 'paste-open') return go({ name: 'paste', from: screen.name === 'welcome' ? 'welcome' : 'review' });
   if (act === 'paste-cancel') return go({ name: screen.from || 'review' }, 'back');

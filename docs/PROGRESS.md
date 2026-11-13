@@ -244,3 +244,13 @@ at the start), shortfall at the baseline + words, actuals dots + readout, too-sh
 `tests/e2e/chart.spec.js` (3): typical / never-coasts / coasting render without NaN, tap updates the readout and shows the rule,
 no overflow. Screenshots `artifacts/chart-{typical,never-coasts,coasting}.png`. `npm run check` → 176/176; e2e 21/21.
 **Needs Harvey's eyes:** chart legibility at phone size, and the tap/drag feel.
+
+## 2026-11-13 T2.5 — IN PROGRESS (not ticked)
+**Changed so far:** `src/ui/timeline.js` (pure scrubber model, readout text, stop-to-stop jumps) + Timeline tab scrubber: native range
+input (keyboard/VoiceOver), visual milestone markers under the slider aligned to the thumb's travel, snap to a moment when released
+within 4 months, spring-eased Next/Previous (instant under reduced motion), list highlight follows. Fixed while testing: rapid taps
+during the spring stepped from the overshoot; markers a year apart had overlapping tap targets; a drag starting on a marker grabbed
+the marker instead of the slider.
+**Verified:** `tests/timeline.test.js` (3) pass; `npm run check` 179/179. e2e: reduced-motion test passes; the main scrubber test
+passes keyboard, Next/Previous steps but its tap-near-marker → snap assertion still fails when run after the earlier steps — next
+thing to fix before ticking T2.5.
