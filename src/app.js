@@ -28,6 +28,7 @@ import { emptyBudget, STARTER_CATEGORIES, weekRow, setEntry, addWeeks, weekLabel
 import { cashNow, netWorth, parseEntry, entryText, defaultWeek } from './budget/view.js';
 import { applyWhatIf, describeChanges, compareModel } from './ui/compare.js';
 import { checkinFields, valuesToQ49, makeSnapshot, trend, backupDue } from './ui/checkin.js';
+import { realityCheck } from './budget/reality.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -402,6 +403,7 @@ function planHTML() {
         <p class="mini">${m(s.openingPot)} saved now · ${D.glide.needToday > 0 ? `${m(D.glide.needToday)} needed today to stay on plan` : 'your future saving covers the target'}</p>
       </section>
       ${checkinCardHTML(D)}
+      ${realityHTML(s)}
       <section class="card free ${D.free.amount > 0 ? 'has' : ''}">
         <span class="lab">Free money this month</span>
         <span class="big"${animate && D.free.amount > 0 ? ` data-count="${Math.round(D.free.amount)}" data-cur="${cur}"` : ''}>${m(D.free.amount)}</span>
@@ -561,6 +563,50 @@ function openCheckin() {
     closeSheet();
     render('none', { keepScroll: true });
     toast(`Checked in — ${STATUS_WORD[snap.status]}${lines.length ? ' · ' + lines[0] : ''}`);
+  } });
+}
+
+// ---------------- reality check (T3.4): does the budget back up the plan's investing? ----------------
+function investingNowOf(s) {
+  const it = (s.items || []).find((i) => i.id === 'investing');
+  const steps = (it && it.steps) || [];
+  return steps.filter((st) => st.from <= s.start).sort((a, b) => (a.from < b.from ? -1 : 1)).pop()?.monthly || 0;
+}
+function realityHTML(s) {
+  if (!budget) return '';
+  const planned = investingNowOf(s);
+  const r = realityCheck(budget, { today: isoToday(), convert: (a, f, t) => fx.convert(a, f, t), base: base(), plannedMonthly: planned });
+  if (!r) return '';
+  const m = (x) => money(x, base());
+  if (r.verdict === 'too-few') return `<section class="card rc"><span class="lab">Reality check</span><p class="mini">Once your budget has a couple of weeks that have happened, Forge checks your plan against it.</p></section>`;
+  const text = {
+    more: `Your budget leaves about <b>${m(r.monthlyLeft)}</b> a month — more than the <b>${m(planned)}</b> your plan assumes you invest. Investing the difference would bring coast sooner.`,
+    close: `Your budget leaves about <b>${m(r.monthlyLeft)}</b> a month, in line with the <b>${m(planned)}</b> your plan assumes. ✓`,
+    less: `Your plan assumes <b>${m(planned)}</b> a month invested, but your budget leaves about <b>${m(r.monthlyLeft)}</b>. Trim spending, or plan with the real figure.`,
+    negative: `Your budget is spending more than comes in — about <b>${m(-r.monthlyLeft)}</b> a month short. The plan’s ${m(planned)} a month of investing isn’t happening yet.`,
+  }[r.verdict];
+  const offer = (r.verdict === 'more' || r.verdict === 'less') && r.monthlyLeft > 0;
+  return `<section class="card rc rc-${r.verdict}"><span class="lab">Reality check</span><p class="rc-t">${text}</p>
+    ${offer ? `<button class="btn small" data-act="rc-use" data-val="${Math.round(r.monthlyLeft)}">Plan with ${m(Math.round(r.monthlyLeft))} a month</button>` : ''}
+    <p class="mini">From your last ${r.weeks} weeks of budget (${weekLabel(r.from).split(' – ')[0]} – ${weekLabel(r.to).split(' – ')[1]}), money in minus money out.</p></section>`;
+}
+function openUseReality(amount) {
+  const q50 = { ...((state.answers.q50 && state.answers.q50.v) || {}), now: { amount, currency: base() } };
+  const before = planSnap();
+  const saved = state.answers;
+  state = { ...state, answers: { ...state.answers, q50: { v: q50 } } };
+  const lines = diffSnapshots(before, planSnap(), { currency: base() });
+  state = { ...state, answers: saved };
+  openSheet({ label: 'Plan with your real figure', html: `<div class="sh-top"><h2 class="h2">Plan with ${money(amount, base())} a month</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <p class="sub">Your answer to “How much will you invest each month — now” (question 50) becomes ${money(amount, base())}. Training and First Officer amounts stay as they are.</p>
+    <div class="sh-preview">${lines.length ? `<span class="lab">What this does to your plan</span><ul class="bul">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : '<span class="mini">Your headline numbers don’t move.</span>'}</div>
+    <div class="sh-actions single"><button class="btn primary" data-rc="go">Update my plan</button></div>`,
+  onClick: (e) => {
+    if (!e.target.closest('[data-rc="go"]')) return;
+    state = store.save({ ...state, answers: { ...state.answers, q50: { v: q50 } } });
+    closeSheet();
+    render('none', { keepScroll: true });
+    toast(`Plan updated${lines.length ? ' — ' + lines[0] : ''}`);
   } });
 }
 
@@ -785,6 +831,7 @@ function budgetHTML() {
     ${budSeg === 'invest' ? investHTML() : `
     <section class="card nw" data-bud-nw>${netWorthHTML()}</section>
     <section class="card wk">${weekHTML()}</section>
+    ${(() => { const { s } = buildScenario(); return s ? realityHTML(s) : ''; })()}
     <section class="card" data-bud-forecast>${forecastHTML()}</section>
     ${billsHTML()}`}
     <button class="link-btn danger-link" data-act="bud-remove">${screen.confirmBudRemove ? 'Tap again to remove the budget from this phone' : 'Remove budget from this phone'}</button>
@@ -1286,6 +1333,7 @@ app.addEventListener('click', (e) => {
   if (act === 'wi-compare') { screen = { name: 'scenarios', compare: val }; return render('fwd'); }
   if (act === 'wi-back') { screen = { name: 'scenarios' }; return render('back'); }
   if (act === 'ci-open') return openCheckin();
+  if (act === 'rc-use') return openUseReality(Number(val));
   if (act === 'ev-add') return openEventEditor(null);
   if (act === 'ev-edit') return openEventEditor(val);
   if (act === 'tl-step') {

@@ -390,3 +390,15 @@ bigger ISA → chip **Behind → Ahead**, card "Last: Nov 2026 · Ahead", two hi
 as Oct behind / Nov ahead, q49 updated; backing up clears the nudge; "fill from my budget" puts investments £1,870, Premium Bonds
 £2,000 and A$3,839 into the form. Screenshot `artifacts/checkin-card.png`. `npm run check` → 214/214; e2e 35/35.
 **Needs Harvey's eyes:** do a real check-in at the start of each month.
+
+## 2026-11-13 T3.4 — Reality check
+**Changed:** `src/budget/reality.js` (pure): from the budget's weeks that have **started** (Harvey's sheet also holds planned future
+weeks; last 8 by default) → average money left over per week (money in − money out) → per month (× 52/12) in the base currency,
+compared with the monthly investing the plan assumes now → `more` / `close` (±10%) / `less` / `negative` / `too-few`. A **Reality
+check** card on the Plan and in Budget → Money says it plainly ("Your budget leaves about £1,020 a month — more than the £500 your
+plan assumes…", or "…spending more than comes in"), names the weeks used, and offers **Plan with £X a month** → preview of what
+moves → updates q50 "now" only (training / First Officer amounts untouched).
+**Verified:** `tests/budget.test.js` (+1: started weeks only, weekly → monthly maths, all verdicts, look-back window).
+`tests/e2e/checkin.spec.js` (+1): sample budget with four weeks started → "more than the £500" → Plan with ≈£1,020 → q50 updated →
+card now says "in line with". Screenshot `artifacts/reality-check.png`. `npm run check` → 215/215; e2e 36/36.
+**Needs Harvey's eyes:** with your real sheet, does the "left over" figure match what you actually manage to put away?

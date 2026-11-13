@@ -64,3 +64,31 @@ test('check-in can fill cash, Premium Bonds and investments from the budget', as
   await expect(sheet.locator('[name="cashGBP"]')).toHaveValue('2000');  // Premium Bonds
   await expect(sheet.locator('[name="cashAUD"]')).toHaveValue('3839');  // A$5,000 − two weeks of spending (pay lands later)
 });
+
+test('reality check: budget leaves more than the plan assumes → plan with the real figure', async ({ page }) => {
+  mkdirSync('test-results', { recursive: true });
+  writeFileSync('test-results/rc-budget.xlsx', sampleBudgetWorkbook());
+  await page.clock.setFixedTime(new Date('2026-11-25T10:00:00')); // four weeks of the sample have started
+  await prepare(page);
+  await fresh(page);
+  await seedAnswers(page, ANSWERS); // plan assumes £500/mo invested now
+  await page.goto('/#budget');
+  await page.reload();
+  await page.locator('[data-act="bud-import"]').setInputFiles('test-results/rc-budget.xlsx');
+  await page.getByRole('button', { name: 'Save to my budget' }).click();
+  // Weeks 1–4 average ≈ A$1,015 − 450 − 121.5 − 10 + 8.75 ≈ A$441/wk → ×52/12 ≈ A$1,912 → × (0.8/1.5) ≈ £1,020/mo
+  const rc = page.locator('.rc').first();
+  await expect(rc).toContainText('more than the £500 your plan assumes');
+  await page.locator('#tabbar').getByRole('link', { name: 'Plan' }).click();
+  await expect(page.locator('.rc')).toContainText('From your last 4 weeks of budget');
+  const btn = page.locator('.rc').getByRole('button', { name: /Plan with £[\d,]+ a month/ });
+  const label = await btn.textContent();
+  const amount = Number(label.replace(/[^0-9]/g, ''));
+  expect(amount).toBeGreaterThan(950); expect(amount).toBeLessThan(1100);
+  await btn.click();
+  await page.getByRole('dialog', { name: 'Plan with your real figure' }).getByRole('button', { name: 'Update my plan' }).click();
+  await expect(page.locator('.toast')).toContainText('Plan updated');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('forge.onboarding.v1')).answers.q50.v.now.amount)).toBe(amount);
+  await expect(page.locator('.rc')).toContainText('in line with');
+  await page.locator('.rc').screenshot({ path: `${ART}/reality-check.png` });
+});

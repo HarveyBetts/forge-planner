@@ -171,3 +171,22 @@ test('view: default week is this week if covered, else the nearest week with dat
   assert.equal(defaultWeek(b, '2026-01-01'), '2026-11-02');
   assert.equal(defaultWeek(b, '2030-01-01'), Object.keys(b.entries).sort().pop());
 });
+
+import { realityCheck } from '../src/budget/reality.js';
+test('reality check: only started weeks, monthly from weekly, verdicts', () => {
+  const b = sheetLike(); // AUD, weekly totals ≈ 900+w −400 −(100..120)
+  const convert = (a, f, t) => (f === 'AUD' && t === 'GBP' ? a * 0.5 : NaN);
+  assert.equal(realityCheck(null, {}), null);
+  assert.deepEqual(realityCheck(b, { today: '2026-11-03', convert, base: 'GBP', plannedMonthly: 500 }), { weeks: 1, verdict: 'too-few' });
+  const r = realityCheck(b, { today: '2026-11-16', convert, base: 'GBP', plannedMonthly: 500 }); // weeks 1–3 started
+  assert.equal(r.weeks, 3);
+  const weekly = ((900 - 400 - 100) + (901 - 400 - 110) + (902 - 400 - 120)) / 3;
+  assert.ok(Math.abs(r.monthlyLeft - weekly * 0.5 * 52 / 12) < 1e-9);
+  assert.equal(r.verdict, 'more');                                         // ~£851/mo left vs £500 planned
+  assert.equal(realityCheck(b, { today: '2026-11-16', convert, base: 'GBP', plannedMonthly: 850 }).verdict, 'close');
+  assert.equal(realityCheck(b, { today: '2026-11-16', convert, base: 'GBP', plannedMonthly: 2000 }).verdict, 'less');
+  const broke = setEntry(setEntry(setEntry(b, '2026-11-02', 'rent', -5000), '2026-11-09', 'rent', -5000), '2026-11-16', 'rent', -5000);
+  assert.equal(realityCheck(broke, { today: '2026-11-16', convert, base: 'GBP', plannedMonthly: 500 }).verdict, 'negative');
+  // lookback limits the window to the most recent weeks
+  assert.equal(realityCheck(b, { today: '2027-06-01', convert, base: 'GBP', plannedMonthly: 0, lookback: 4 }).weeks, 4);
+});

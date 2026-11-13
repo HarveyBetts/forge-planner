@@ -45,7 +45,7 @@ Harvey's own spreadsheet (budget + investments) defines this phase — see D23. 
 - [x] **T3.1** Monthly check-in: enter actual pot values → snapshot → compare to glide path. Accept: on-track/behind updates.
 - [ ] **T3.2b** (was T3.2) Planned vs actual per category and "freed-up money" linked to the engine's `freed` value.
 - [ ] **T3.3** CSV import (column mapping, dedupe, preview before commit). Accept: sample CSV fixtures for 2 bank formats; malformed rows reported, not crashed.
-- [ ] **T3.4** Reality check card: compares actual monthly saving rate with what the plan assumes. Accept: tests.
+- [x] **T3.4** Reality check card: compares actual monthly saving rate with what the plan assumes. Accept: tests.
 
 ## Phase 4 — Backend (needs Harvey for H1–H3; build against mocks first)
 - [ ] **T2.2f** (Phase 4) Sync onboarding answers to Supabase `onboarding_answers`; add the Supabase origin to the CSP `connect-src`. Accept: mocked sync tests.
