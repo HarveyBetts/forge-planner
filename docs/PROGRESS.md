@@ -418,3 +418,15 @@ merchant keys, weekly totals and re-import adding nothing. `tests/e2e/csv.spec.j
 week totals (e.g. food A$178.20, rent A$1,100, income A$2,290) → same file again: 0 new / 6 already in → a £ Monzo file converted
 into A$; junk file → readable message. Screenshot `artifacts/csv-sort.png`. `npm run check` → 223/223; e2e 38/38.
 **Needs Harvey's eyes:** try an export from your bank app (CommBank: NetBank → Transactions → Export → CSV).
+
+## 2026-11-13 T3.2b — Planned vs actual, and what coasting frees up
+**Changed:** `src/budget/plan.js` (pure): weekly plan per category (`budget.plan`), `weekVsPlan` (actual vs plan, over / short),
+`overPlan`, `setPlan`, `flagLevel` (how loudly to flag overspending, from q47: off / quietly / a nudge / loud and clear). Budget →
+Money: tap a category's name → **weekly plan** sheet; each row shows a small progress bar and "of A$100" or "A$21 over" (bar and
+words depend on the flag level; "Loud and clear" adds an "Over plan this week: Food by A$21." banner); hints update in place as you
+type. **When you coast** card: the plan's investing at the coast date, converted to the budget currency **per week** ("From Mar 2041,
+your planned £1,500 a month of investing becomes optional — about A$649 a week you could spend instead"), or that it stays needed.
+**Verified:** `tests/budget.test.js` (+1). `tests/e2e/plan-vs-actual.spec.js` (2): set Food A$100 → "A$21 over" with bar, no banner
+(default nudge) → edit to 60 → "of A$100"; coast card shows A$649 a week; "Loud and clear" → banner; "Don’t flag it" → no bar, no
+warning words. Screenshot `artifacts/plan-vs-actual.png`. `npm run check` → 224/224; e2e 40/40.
+**Needs Harvey's eyes:** set plans for your big categories (rent, food) and see if the nudges feel right.

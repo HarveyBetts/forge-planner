@@ -30,6 +30,7 @@ import { applyWhatIf, describeChanges, compareModel } from './ui/compare.js';
 import { checkinFields, valuesToQ49, makeSnapshot, trend, backupDue } from './ui/checkin.js';
 import { realityCheck } from './budget/reality.js';
 import { parseCSV, detectColumns, toTransactions, merchantKey, applyTransactions } from './budget/csv.js';
+import { weekVsPlan, overPlan, setPlan, flagLevel } from './budget/plan.js';
 import {
   projectScenario, scenarioCoastStatus, ym,
 } from './engine/engine.js';
@@ -838,6 +839,7 @@ function budgetHTML() {
     <p class="err" role="alert" data-err></p>
     ${(() => { const { s } = buildScenario(); return s ? realityHTML(s) : ''; })()}
     <section class="card" data-bud-forecast>${forecastHTML()}</section>
+    ${coastFreesHTML()}
     ${billsHTML()}`}
     <button class="link-btn danger-link" data-act="bud-remove">${screen.confirmBudRemove ? 'Tap again to remove the budget from this phone' : 'Remove budget from this phone'}</button>
   </div>`;
@@ -885,9 +887,55 @@ function weekHTML() {
       <span class="wk-l">${weekLabel(budWeek)}${budWeek === mondayOf(isoToday()) ? ' · this week' : ''}</span>
       <button class="icon-btn" data-act="bud-week" data-val="1" aria-label="Next week"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></div>
     <div class="wk-sum" data-bud-sum>${weekSumHTML()}</div>
-    <ul class="wk-list">${budget.categories.map((c) => `<li class="${c.kind === 'income' ? 'is-in' : ''}"><label for="be-${esc(c.id)}">${esc(c.name)}</label>
-      <input class="in be" id="be-${esc(c.id)}" data-cat="${esc(c.id)}" data-kind="${c.kind}" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(entryText(row[c.id], c.kind))}"></li>`).join('')}</ul>
-    <p class="mini">Type what you spent. Money back into a spending category? Start it with +.</p>`;
+    <div data-bud-over>${overBannerHTML()}</div>
+    <ul class="wk-list">${budget.categories.map((c) => `<li class="${c.kind === 'income' ? 'is-in' : ''}"><div class="wk-c">
+      <button class="wk-name" data-act="bud-plan" data-val="${esc(c.id)}" aria-label="${esc(c.name)} — set a weekly plan">${esc(c.name)}</button>
+      <span class="wk-plan" data-plan="${esc(c.id)}">${planHintHTML(c.id)}</span></div>
+      <input class="in be" id="be-${esc(c.id)}" data-cat="${esc(c.id)}" data-kind="${c.kind}" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="${esc(c.name)} this week" value="${esc(entryText(row[c.id], c.kind))}"></li>`).join('')}</ul>
+    <p class="mini">Type what you spent. Money back into a spending category? Start it with +. Tap a category’s name to give it a weekly plan.</p>`;
+}
+function planHintHTML(catId) {
+  const r = weekVsPlan(budget, budWeek).find((x) => x.id === catId);
+  if (!r || !r.plan) return '';
+  const fl = flagLevel(settingsFromAnswers(state.answers).overspend);
+  const pctW = Math.min(100, Math.round((r.ratio || 0) * 100));
+  const bad = r.over > 0;
+  return `${fl.bar ? `<i class="wk-bar${bad ? ' over' : ''}"><b style="width:${pctW}%"></b></i>` : ''}<small class="${bad && fl.text ? 'over' : ''}">${bad && fl.text ? `${bm(r.over)} over` : `of ${bm(r.plan)}`}${r.kind === 'income' && r.short ? ` · ${bm(r.short)} short` : ''}</small>`;
+}
+function overBannerHTML() {
+  if (!flagLevel(settingsFromAnswers(state.answers).overspend).banner) return '';
+  const o = overPlan(budget, budWeek);
+  return o.length ? `<p class="banner warn" role="status">Over plan this week: ${o.map((r) => `${esc(r.name)} by ${bm(r.over)}`).join(', ')}.</p>` : '';
+}
+function openPlanSheet(catId) {
+  const c = budget.categories.find((x) => x.id === catId);
+  if (!c) return;
+  const cur = (budget.plan || {})[catId];
+  openSheet({ label: `Weekly plan for ${c.name}`, html: `<div class="sh-top"><h2 class="h2">${esc(c.name)}</h2><button class="btn small ghost" data-sheet-close>Cancel</button></div>
+    <p class="sub">${c.kind === 'income' ? 'How much do you expect to come in each week?' : 'How much do you plan to spend each week?'} Leave blank for no plan.</p>
+    <div class="field"><label for="bp">Weekly plan</label><div class="money"><span class="money-sym">${budget.currency === 'AUD' ? 'A$' : budget.currency === 'GBP' ? '£' : budget.currency}</span><input class="in" id="bp" inputmode="decimal" autocomplete="off" value="${cur ?? ''}"></div></div>
+    <div class="sh-actions single"><button class="btn primary" data-bp="save">Save plan</button></div>`,
+  onClick: async (e) => {
+    if (!e.target.closest('[data-bp="save"]')) return;
+    await saveBudget(setPlan(budget, catId, sheetBody().querySelector('#bp').value));
+    closeSheet(); render('none', { keepScroll: true }); toast(`${c.name} plan saved`);
+  } });
+}
+// "When you coast": the plan's free money, in the budget's currency per week (T3.2b — the engine's freed money, made concrete).
+function coastFreesHTML() {
+  const { s } = buildScenario();
+  if (!s) return '';
+  const res = projectScenario(s);
+  const cs = scenarioCoastStatus(s);
+  const inv = investingNowOf(s);
+  const later = (s.items.find((i) => i.id === 'investing') || {}).steps || [];
+  const atCoast = res.coastDate ? (later.filter((st) => st.from <= res.coastDate).pop() || {}).monthly || inv : inv;
+  if (!(atCoast > 0)) return '';
+  const weekly = (budget.currency === base() ? atCoast : fx.convert(atCoast, base(), budget.currency)) * 12 / 52;
+  const when = cs.isCoasting ? 'Now' : res.coastDate ? `From ${monthLabel(res.coastDate)}` : null;
+  return `<section class="card cf"><span class="lab">When you coast</span>${when
+    ? `<p class="rc-t">${when}, your planned <b>${money(atCoast, base())}</b> a month of investing becomes optional — about <b>${bm(weekly)}</b> a week you could spend instead.</p>`
+    : `<p class="rc-t">On these numbers you don’t reach coast before you stop work, so your <b>${money(atCoast, base())}</b> a month of investing stays needed.</p>`}</section>`;
 }
 function forecastHTML() {
   const f = forecastBy(budget, 2);
@@ -981,6 +1029,8 @@ async function csvSave() {
 function budRefreshParts() {
   const set = (sel, html) => { const el = app.querySelector(sel); if (el) el.innerHTML = html; };
   set('[data-bud-sum]', weekSumHTML());
+  set('[data-bud-over]', overBannerHTML());
+  app.querySelectorAll('[data-plan]').forEach((el) => { el.innerHTML = planHintHTML(el.dataset.plan); });
   set('[data-bud-forecast]', forecastHTML());
   set('[data-bud-nw]', netWorthHTML());
 }
@@ -1381,6 +1431,7 @@ app.addEventListener('click', (e) => {
   if (act === 'bud-import-cancel') { budPreview = null; return render('back'); }
   if (act === 'bud-import-save') { const b = budPreview.budget; budPreview = null; budWeek = null; saveBudget(b).then(() => { render('fwd'); toast('Budget imported'); }); return; }
   if (act === 'bud-use') return openUseBalances();
+  if (act === 'bud-plan') return openPlanSheet(val);
   if (act === 'csv-save') { csvSave(); return; }
   if (act === 'csv-cancel') { budCsv = null; return render('back'); }
   if (act === 'bud-price') return openPriceSheet(val);

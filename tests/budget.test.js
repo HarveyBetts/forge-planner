@@ -190,3 +190,19 @@ test('reality check: only started weeks, monthly from weekly, verdicts', () => {
   // lookback limits the window to the most recent weeks
   assert.equal(realityCheck(b, { today: '2027-06-01', convert, base: 'GBP', plannedMonthly: 0, lookback: 4 }).weeks, 4);
 });
+
+import { weekVsPlan, overPlan, setPlan, flagLevel } from '../src/budget/plan.js';
+test('planned vs actual: spend over plan, income short of plan, plan editing', () => {
+  let b = sheetLike(); // week 2026-11-02: income 900, rent −400, food −100
+  b = setPlan(setPlan(setPlan(b, 'rent', '400'), 'food', 'A$80'), 'income', 1000);
+  const w = Object.fromEntries(weekVsPlan(b, '2026-11-02').map((r) => [r.id, r]));
+  assert.deepEqual([w.rent.actual, w.rent.plan, w.rent.over, w.rent.ratio], [400, 400, 0, 1]);
+  assert.deepEqual([w.food.actual, w.food.plan, w.food.over], [100, 80, 20]);
+  assert.deepEqual([w.income.actual, w.income.short], [900, 100]);
+  assert.equal(w.refund.plan, 0);
+  assert.deepEqual(overPlan(b, '2026-11-02').map((r) => r.id), ['food']);
+  assert.equal(setPlan(b, 'food', '').plan.food, undefined);
+  assert.equal(setPlan(b, 'food', '0').plan.food, undefined);
+  assert.deepEqual(flagLevel('off'), { bar: false, text: false, banner: false });
+  assert.deepEqual(flagLevel('loud'), { bar: true, text: true, banner: true });
+});
