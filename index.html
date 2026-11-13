@@ -22,21 +22,21 @@
 <style>
 :root{
   --bg:#F3F5F8;--surface:#FFFFFF;--ink:#0F172A;--muted:#4B5568;--line:#E3E8F0;--soft:#EAEFF6;
-  --accent:#2F6BFF;--accent-ink:#1D4ED8;--accent-soft:#E4ECFF;
-  --ok:#0E8A62;--ok-soft:#DDF5EC;--warn:#F59E0B;--warn-ink:#8A5300;--warn-soft:#FFF1D6;--danger:#C53030;
+  --accent:#2F6BFF;--accent-ink:#1D4ED8;--accent-soft:#E4ECFF;--btn:#2C66F5;
+  --ok:#0A7A56;--ok-soft:#DDF5EC;--warn:#F59E0B;--warn-ink:#8A5300;--warn-soft:#FFF1D6;--danger:#C53030;
   --shadow:0 6px 24px rgba(15,23,42,.07);--r:20px;
   --e-out:cubic-bezier(.22,.61,.36,1);--e-slide:cubic-bezier(.22,.9,.3,1);--e-spring:cubic-bezier(.34,1.56,.64,1);
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0B1220;--surface:#131C2E;--ink:#E7ECF5;--muted:#A3AEC2;--line:#24304A;--soft:#1B2640;
-  --accent:#5B8CFF;--accent-ink:#9DB8FF;--accent-soft:#1C2B52;
+  --accent:#5B8CFF;--accent-ink:#9DB8FF;--accent-soft:#1C2B52;--btn:#2C66F5;
   --ok:#3DD39B;--ok-soft:#123B2E;--warn:#FFB547;--warn-ink:#FFC56B;--warn-soft:#3A2C12;--danger:#FF7A7A;
   --shadow:0 6px 24px rgba(0,0,0,.35);color-scheme:dark;
 }}
 :root[data-theme="dark"]{
   --bg:#0B1220;--surface:#131C2E;--ink:#E7ECF5;--muted:#A3AEC2;--line:#24304A;--soft:#1B2640;
-  --accent:#5B8CFF;--accent-ink:#9DB8FF;--accent-soft:#1C2B52;
+  --accent:#5B8CFF;--accent-ink:#9DB8FF;--accent-soft:#1C2B52;--btn:#2C66F5;
   --ok:#3DD39B;--ok-soft:#123B2E;--warn:#FFB547;--warn-ink:#FFC56B;--warn-soft:#3A2C12;--danger:#FF7A7A;
   --shadow:0 6px 24px rgba(0,0,0,.35);color-scheme:dark;
 }
@@ -71,7 +71,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:
 @media (hover:hover) and (pointer:fine){.choose:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(15,23,42,.12)}.opt:hover{border-color:var(--accent)}.rv-row:hover{background:var(--soft)}}
 .btn{min-height:48px;padding:0 18px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);font-weight:600;font-size:16px;
   transition:transform .15s var(--e-out),background .15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary{background:var(--btn);border-color:var(--btn);color:#fff}
 .btn.ghost{border-color:transparent;background:transparent;color:var(--accent-ink)}
 .btn.danger{color:var(--danger)}
 .btn.small{min-height:40px;padding:0 14px;font-size:15px}
@@ -356,7 +356,7 @@ body.has-tabbar .screen{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .tl-i.warn .tl-dot::after{border-color:var(--warn-ink);background:var(--warn-soft)}
 .k-end .tl-dot::after{width:16px;height:16px;background:var(--ink);border-color:var(--ink)}
 .tl-b{flex:1;min-width:0;background:var(--surface);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:2px}
-.tl-i.after .tl-b{opacity:.75}
+.tl-i.after .tl-b{box-shadow:none;border:1.5px dashed var(--line);background:transparent}
 .tl-d{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.01em}
 .tl-l{font-weight:600;font-size:15px;overflow-wrap:anywhere}
 .tl-m{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -378,6 +378,8 @@ body.has-tabbar .screen{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
 .row.danger{color:var(--danger)}
 .list-note{color:var(--muted);font-size:13px;margin:8px 18px 10px}
 @media (hover:hover) and (pointer:fine){.row:hover{background:var(--soft)}}
+/* keyboard focus: one consistent, visible ring (T6.2) — touch taps don't trigger :focus-visible */
+button:focus-visible,a:focus-visible,summary:focus-visible,[role="button"]:focus-visible,.opt:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:12px}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (max-width:360px){.qtitle{font-size:22px}.qfoot{grid-template-columns:1fr 1fr 1.2fr}.btn{padding:0 10px;font-size:15px}.grid2{grid-template-columns:1fr}}
 </style>

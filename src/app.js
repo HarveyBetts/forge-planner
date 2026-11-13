@@ -1556,6 +1556,8 @@ app.addEventListener('change', (e) => {
 
 app.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.matches && e.target.matches('.be')) { e.preventDefault(); e.target.blur(); return; }
+  // Rows that act like buttons (role="button") respond to Enter and Space, like real buttons (T6.2).
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute && e.target.getAttribute('role') === 'button' && e.target.tagName !== 'BUTTON') { e.preventDefault(); e.target.click(); return; }
   if (e.key !== 'Enter' || screen.name !== 'question') return;
   if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
   e.preventDefault();

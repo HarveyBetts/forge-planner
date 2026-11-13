@@ -70,6 +70,10 @@ export function closeSheet(immediate = false) {
   current = null;
   cleanup();
   document.body.classList.remove('sheet-open');
+  // While it slides away it's no longer a dialog: hidden from screen readers and not tappable.
+  wrap.setAttribute('aria-hidden', 'true');
+  wrap.style.pointerEvents = 'none';
+  sheet.removeAttribute('role');
   const done = () => wrap.remove();
   if (immediate || reduce) done();
   else {

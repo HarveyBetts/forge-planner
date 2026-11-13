@@ -469,3 +469,22 @@ sourced estimates, never a promise, check big decisions with your provider / a r
 "guarantee", backup downloads from the privacy page, footer link works, no overflow. Screenshot `artifacts/privacy.png`.
 `npm run check` → 228/228; e2e 42/42.
 **Needs Harvey's eyes:** read the two pages — they should match how you want Forge to treat people's data.
+
+## 2026-11-13 T6.2 — Accessibility + performance pass
+**Checklist**
+- [x] **Automated WCAG 2.1 A/AA** (axe-core, test-only dependency) on welcome, a question, import check, Plan, Timeline, Budget,
+  Investments, Scenarios, Settings, Your answers, Privacy, Not-advice and the event sheet — **light and dark: 0 serious/critical**.
+- [x] **Contrast fixes found by it:** primary buttons 4.49:1 / 3.16:1 (dark) → new `--btn` #2C66F5 = 4.85:1 in both themes (one notch
+  deeper than the Slate blue; rings/links keep the brand blue); success green 4.34:1 → #0A7A56 = 5.34:1 on white, 4.67:1 on its pale
+  chips; faded "after you stop work" timeline cards no longer use opacity (dashed outline instead).
+- [x] **Focus order / keyboard:** one visible focus ring for buttons, links, disclosure summaries and role="button" rows (keyboard only —
+  taps don't show it); role="button" rows now work with Enter and Space; the scrubber is a native range (arrows, Home/End).
+- [x] **ARIA:** ring and chart are `role="img"` with descriptive labels; chart readout and sheet previews are `aria-live`; tab bar
+  uses `aria-current`; segmented control uses tabs; a closing sheet is no longer announced as a dialog (found by the new test).
+- [x] **No layout shift:** CLS 0.000 measured across Plan/Timeline/Budget/Scenarios navigation.
+- [x] **No infinite animations / animated filters:** none in CSS or JS; the tab bar's blur is static; reduced motion honoured
+  (e2e runs with it).
+- [x] **Render cost:** ~50 ms for the Plan (with the four "what would get you there" solvers) and Timeline on desktop Chromium —
+  expected to stay well under a quarter-second on an iPhone.
+**Verified:** `tests/e2e/a11y.spec.js` (3) incl. the keyboard test. `npm run check` → 228/228; e2e 45/45.
+**Needs Harvey's eyes:** the primary-button blue is a touch deeper than before — tell me if it reads as "off brand".
